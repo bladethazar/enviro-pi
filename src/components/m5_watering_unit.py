@@ -62,6 +62,8 @@ class M5WateringUnit:
     
     def reset_water_tank_capacity(self):
         self.WATER_TANK_CAPACITY = PicoWConfig.WATER_TANK_FULL_CAPACITY
+        self.water_used = 0
+        print("Waten tank capacity resetted!")
 
     def get_current_data(self):
         with self.lock:

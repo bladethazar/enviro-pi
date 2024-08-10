@@ -27,7 +27,7 @@ mqtt_manager = MQTTManager(PicoWConfig, log_mgr)
 
 # Initialize components
 m5_watering_unit = M5WateringUnit(log_mgr)
-enviro_plus = PicoEnviroPlus(PicoWConfig, log_mgr)
+enviro_plus = PicoEnviroPlus(PicoWConfig, log_mgr, m5_watering_unit.reset_water_tank_capacity)
 enviro_plus.init_sensors()
 enviro_plus_led = enviro_plus.get_led()
 

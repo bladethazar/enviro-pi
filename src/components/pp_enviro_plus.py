@@ -10,7 +10,7 @@ from adcfft import ADCFFT
 
 class PicoEnviroPlus:
 
-    def __init__(self, config, log_manager) -> None:
+    def __init__(self, config, log_manager, reset_water_tank_capacity) -> None:
         self.log_manager = log_manager
         
         # Set configuration
@@ -39,7 +39,7 @@ class PicoEnviroPlus:
             self.button_a: self.toggle_backlight,
             self.button_b: None,  # TODO: Add wifi reset functionality
             self.button_x: self.cycle_display_mode,
-            self.button_y: None   # TODO: Add reset water-tank capacity
+            self.button_y: reset_water_tank_capacity   # TODO: Add reset water-tank capacity
         }
         
         # Initialize edge values for temperature and gas (overwritten later)
