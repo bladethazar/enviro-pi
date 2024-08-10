@@ -1,11 +1,4 @@
 import time
-# from machine import Pin, ADC
-# from picographics import PicoGraphics, DISPLAY_ENVIRO_PLUS
-# from pimoroni import RGBLED, Button
-# from breakout_bme68x import BreakoutBME68X
-# from pimoroni_i2c import PimoroniI2C
-# from breakout_ltr559 import BreakoutLTR559
-# from adcfft import ADCFFT
 
 class PicoEnviroPlusDisplayMgr:
     def __init__(self, enviro_plus, log_mgr, data_mgr) -> None:
@@ -59,6 +52,7 @@ class PicoEnviroPlusDisplayMgr:
         # Clear the display and set the background
         self.enviro_plus_display.set_pen(self.BLACK)
         self.enviro_plus_display.clear()
+        self.enviro_plus.adcfft.update()
 
         # Display the title
         title_scale = 2.5  # Scale for the title
@@ -86,7 +80,7 @@ class PicoEnviroPlusDisplayMgr:
         # Display the temperature
         self.enviro_plus_display.text(f"{corrected_temperature:.1f}C", 5, y_offset + 5, scale=3)
         
-        text_scale = 1.5
+        text_scale = 2
 
         # Display min and max temperatures
         self.enviro_plus_display.set_pen(self.CYAN)
@@ -99,21 +93,25 @@ class PicoEnviroPlusDisplayMgr:
 
         # Draw the first column of sensor data
         self.enviro_plus_display.set_pen(self.WHITE)
-        self.enviro_plus_display.text(f"RH: {corrected_humidity:.0f}% >", 5, y_offset, scale=text_scale)
-        y_offset += 40
-        self.enviro_plus_display.text(f"Pressure: {pressure_hpa:.0f} hPa >", 5, y_offset, scale=text_scale)
-        y_offset += 40
-        self.enviro_plus_display.text(f"Light: {lux} lux >", 5, y_offset, scale=text_scale)
+        self.enviro_plus_display.text(f"Hum: {corrected_humidity:.0f}%", 5, y_offset, scale=text_scale)
+        y_offset += 35
+        self.enviro_plus_display.text(f"hPa: {pressure_hpa:.0f}", 5, y_offset, scale=text_scale)
+        y_offset += 35
+        self.enviro_plus_display.text(f"Lux: {lux}", 5, y_offset, scale=text_scale)
+        y_offset += 35
+        self.enviro_plus_display.text(f"Mic: {self.enviro_plus.adcfft}", 5, y_offset, scale=text_scale)
 
         # Reset y_offset for the second column
         y_offset = 100
 
         # Draw the second column of sensor descriptions
         self.enviro_plus_display.text(f" {self.data_mgr.describe_humidity(corrected_humidity)}", x_offset, y_offset, scale=text_scale)
-        y_offset += 40
+        y_offset += 35
         self.enviro_plus_display.text(f" {self.data_mgr.describe_pressure(pressure_hpa)}", x_offset, y_offset, scale=text_scale)
-        y_offset += 40
+        y_offset += 35
         self.enviro_plus_display.text(f" {self.data_mgr.describe_light(lux)}", x_offset, y_offset, scale=text_scale)
+        y_offset += 35
+        self.enviro_plus_display.text(f"???", x_offset, y_offset, scale=text_scale)
 
         # Draw the gas level bar
         if self.enviro_plus.min_gas != self.enviro_plus.max_gas:
@@ -171,7 +169,7 @@ class PicoEnviroPlusDisplayMgr:
 
         # Add "Soil Moisture" label
         self.enviro_plus_display.set_pen(self.WHITE)
-        self.enviro_plus_display.text("Soil Moisture", 5, y_offset + 5, scale=1.5)
+        self.enviro_plus_display.text("Soil Moisture", 5, y_offset + 5, scale=2)
 
         # Set the pen color based on the moisture level
         if current_moisture > 80:
@@ -221,18 +219,18 @@ class PicoEnviroPlusDisplayMgr:
         y_offset = bar_y + bar_height + 10
 
         # Display Water Used
-        self.enviro_plus_display.text("Water Used:", 5, y_offset, scale=text_scale)
-        self.enviro_plus_display.text(f"{water_used:.0f} ml", 5, y_offset + 25, scale=2)
-        y_offset += 60
+        self.enviro_plus_display.text("Reset capacity >>>", 50, y_offset, scale=text_scale)
+        # self.enviro_plus_display.text(f"{water_used:.0f} ml", 5, y_offset + 25, scale=2)
+        # y_offset += 60
 
-        # Display Watering Status
-        watering_status_text = f"Watering: {'Yes' if m5_watering_unit_data['is_watering'] else 'No'}"
-        self.enviro_plus_display.text(watering_status_text, 5, y_offset, scale=text_scale)
-        y_offset += 30
+        # # Display Watering Status
+        # watering_status_text = f"Watering: {'Yes' if m5_watering_unit_data['is_watering'] else 'No'}"
+        # self.enviro_plus_display.text(watering_status_text, 5, y_offset, scale=text_scale)
+        # y_offset += 30
 
-        # Display Watering Cycles
-        watering_cycles_text = f"Cycles: {watering_cycles} / {watering_cycles_configured}"
-        self.enviro_plus_display.text(watering_cycles_text, 5, y_offset, scale=text_scale)
+        # # Display Watering Cycles
+        # watering_cycles_text = f"Cycles: {watering_cycles} / {watering_cycles_configured}"
+        # self.enviro_plus_display.text(watering_cycles_text, 5, y_offset, scale=text_scale)
 
         # Update the display with all the changes
         self.enviro_plus_display.update()
