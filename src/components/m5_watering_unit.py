@@ -99,7 +99,7 @@ class M5WateringUnit:
                     self.get_water_tank_capacity_left() > 0 and 
                     not self.watering_cycle_pause_flag):
                     self.log_manager.log("Starting watering")
-                    await self.start_watering()
+                    await self.trigger_watering()
                 else:
                     self.log_manager.log("Cannot start watering")
                     await self.handle_watering_limits()
@@ -108,7 +108,7 @@ class M5WateringUnit:
                 self.watering_cycles = 0
             self.log_manager.log("Moisture and watering status check completed")
 
-    async def start_watering(self):
+    async def trigger_watering(self):
         self.log_manager.log(f"Start watering for {self.WATERING_DURATION} seconds...")
         self.is_watering = True
         self.watering_cycles += 1

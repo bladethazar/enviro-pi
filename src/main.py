@@ -1,3 +1,4 @@
+import sys
 import uasyncio
 import machine
 import gc
@@ -27,7 +28,7 @@ mqtt_manager = MQTTManager(PicoWConfig, log_mgr)
 
 # Initialize components
 m5_watering_unit = M5WateringUnit(PicoWConfig, log_mgr)
-enviro_plus = PicoEnviroPlus(PicoWConfig, log_mgr, m5_watering_unit.reset_water_tank_capacity)
+enviro_plus = PicoEnviroPlus(PicoWConfig, log_mgr, m5_watering_unit.reset_water_tank_capacity, m5_watering_unit.trigger_watering)
 enviro_plus.init_sensors()
 enviro_plus_led = enviro_plus.get_led()
 
@@ -36,8 +37,8 @@ enviro_plus_display_mgr = PicoEnviroPlusDisplayMgr(enviro_plus, log_mgr, data_mg
 enviro_plus_display_mgr.setup_display(PicoWConfig)
 
 # Connect to WiFi and MQTT
-wifi_manager.connect()
-mqtt_manager.connect()
+# wifi_manager.connect()
+# mqtt_manager.connect()
 
 # Global variables
 last_mqtt_publish = 0
@@ -116,11 +117,23 @@ async def update_display(sensor_data):
     except Exception as e:
         log_mgr.log(f"Error updating display: {e}")
 
-async def handle_mqtt_publishing(sensor_data):
+async def handle_mqtt_publishing(sensor_data): 
     global last_mqtt_publish
     current_time = utime.time()
+    log_mgr.log(f"Current time: {current_time}, Last publish time: {last_mqtt_publish}")
+    log_mgr.log(f"Time since last publish: {current_time - last_mqtt_publish}")
+    log_mgr.log(f"MQTT update interval: {PicoWConfig.MQTT_UPDATE_INTERVAL}")
+    
     if current_time - last_mqtt_publish >= PicoWConfig.MQTT_UPDATE_INTERVAL:
+        log_mgr.log("MQTT publishing interval reached")
+        if not mqtt_manager.is_connected:
+            log_mgr.log("MQTT not connected, attempting to connect...")
+            await mqtt_manager.connect()
+        else:
+            log_mgr.log("Using existing MQTT connection")
+            
         try:
+            log_mgr.log("Preparing MQTT data...")
             enviro_plus_data = {
                 "temperature": sensor_data['temperature'],
                 "humidity": sensor_data['humidity'],
@@ -134,8 +147,10 @@ async def handle_mqtt_publishing(sensor_data):
                 enviro_plus_data,
                 system_mgr.get_system_data()
             )
-            
-            if mqtt_manager.publish_data(prepared_mqtt_data):
+            log_mgr.log("MQTT data prepared, attempting to publish...")
+            publish_result = await mqtt_manager.publish_data(prepared_mqtt_data)
+            log_mgr.log(f"Publish result: {publish_result}")
+            if publish_result:
                 last_mqtt_publish = current_time
                 enviro_plus_led.set_rgb(0, 50, 0)
                 log_mgr.log("MQTT data published successfully")
@@ -145,22 +160,40 @@ async def handle_mqtt_publishing(sensor_data):
         except Exception as e:
             log_mgr.log(f"MQTT publishing error: {e}")
             enviro_plus_led.set_rgb(255, 0, 0)
+    else:
+        log_mgr.log("MQTT publishing interval not reached yet")
 
 async def startup_sequence():
-    enviro_plus.set_display_mode("Watering")  # Set Watering Mode as default
-    log_mgr.enable_buffering()
-    await uasyncio.sleep_ms(100)
-    enviro_plus_display_mgr.set_log_speed(1)
-    await enviro_plus_display_mgr.update_log_display()
-    await uasyncio.sleep(1)
-    
-    log_mgr.log("Startup complete.")
-    await enviro_plus_display_mgr.update_log_display()
-    await uasyncio.sleep(2)  # Display the final message for 2 seconds
-    
-    log_mgr.disable_buffering()
+    try:
+        log_mgr.log("Starting startup sequence...")
+        log_mgr.enable_buffering()
+
+        # Initialize WiFi
+        log_mgr.log("Initializing WiFi...")
+        await wifi_manager.connect()
+        
+        enviro_plus.set_display_mode("Watering")  # Set Watering Mode as default
+        await uasyncio.sleep_ms(100)
+
+        enviro_plus_display_mgr.set_log_speed(1)
+
+        await enviro_plus_display_mgr.update_log_display()
+        await uasyncio.sleep(1)
+        
+        await enviro_plus_display_mgr.update_log_display()
+        await uasyncio.sleep(2)  # Display the final message for 2 seconds
+        
+        log_mgr.disable_buffering()
+        log_mgr.log("Startup sequence finished successfully.")
+    except Exception as e:
+        log_mgr.log(f"Error in startup sequence: {e}")
+        print(f"Error in startup sequence: {e}")
+        sys.print_exception(e)
+        raise
 
 async def main_loop():
+    log_mgr.log("Starting main loop...")
+    await startup_sequence()
     while True:
         try:
             gc.collect()
@@ -168,18 +201,25 @@ async def main_loop():
 
             sensor_data = await read_sensors()
             if sensor_data is None:
+                log_mgr.log("No sensor data available, skipping this iteration")
                 await uasyncio.sleep(5)
                 continue
 
             await handle_watering()
             enviro_plus.check_buttons()
             await update_display(sensor_data)
+            
+            print(sensor_data)
 
+            log_mgr.log("About to check MQTT publishing...")
             if sensor_data.get('status', 0) & STATUS_HEATER_STABLE:
+                log_mgr.log("Heater stable, calling handle_mqtt_publishing...")
                 await handle_mqtt_publishing(sensor_data)
+            else:
+                log_mgr.log("Heater not stable, skipping MQTT publishing")
 
             wdt.feed()
-            await uasyncio.sleep_ms(100)
+            await uasyncio.sleep_ms(1000)
 
         except Exception as e:
             log_mgr.log(f"Error in main loop: {e}")
@@ -187,8 +227,6 @@ async def main_loop():
             await uasyncio.sleep(5)
 
 async def main():
-    log_mgr.log("Starting main loop...")
-    await startup_sequence()
     await main_loop()
 
 # Run the main coroutine

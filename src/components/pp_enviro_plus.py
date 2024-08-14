@@ -10,10 +10,11 @@ from adcfft import ADCFFT
 import gc
 
 class PicoEnviroPlus:
-    def __init__(self, config, log_manager, reset_water_tank_capacity):
+    def __init__(self, config, log_manager, reset_water_tank_capacity, trigger_watering):
         self.config = config
         self.log_manager = log_manager
         self.reset_water_tank_capacity = reset_water_tank_capacity
+        self.trigger_watering = trigger_watering
 
         # Initialize display
         self.display = PicoGraphics(display=DISPLAY_ENVIRO_PLUS, rotate=90)
@@ -118,8 +119,7 @@ class PicoEnviroPlus:
             self.cycle_display_mode()
         elif button == 'Y':
             if self.display_mode == "Watering":
-                # Trigger manual watering
-                pass  # Implement this functionality
+                self.trigger_watering()
             else:
                 self.cycle_display_mode()
 

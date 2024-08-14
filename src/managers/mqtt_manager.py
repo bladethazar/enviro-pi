@@ -4,68 +4,78 @@ import ujson
 import utime
 
 class MQTTManager:
-    def __init__(self, config, log_manager):
+    def __init__(self, config, log_mgr):
         self.config = config
-        self.log_manager = log_manager
+        self.log_mgr = log_mgr
         self.client = None
         self.is_connected = False
         self.last_publish_time = 0
 
     async def connect(self):
+        self.log_mgr.log("Initializing MQTT connection ...")
         try:
             self.client = MQTTClient(self.config.MQTT_CLIENT_NAME, self.config.MQTT_BROKER_ADDRESS, self.config.MQTT_BROKER_PORT)
             self.client.set_callback(self.on_message)
             self.client.connect()
             self.is_connected = True
-            self.log_manager.log(f"MQTT client connected as {self.config.MQTT_CLIENT_NAME}")
+            self.log_mgr.log(f"MQTT client connected as {self.config.MQTT_CLIENT_NAME}")
             await self.subscribe_to_control_topics()
         except Exception as e:
-            self.log_manager.log(f"Failed to connect to MQTT broker: {e}")
+            self.log_mgr.log(f"Failed to connect to MQTT broker: {e}")
             self.is_connected = False
 
     async def reconnect(self):
-        self.log_manager.log("Attempting to reconnect to MQTT broker")
+        self.log_mgr.log("Attempting to reconnect to MQTT broker")
         await self.connect()
 
     async def publish_data(self, data):
+        self.log_mgr.log("Entering publish_data method")
         if not self.is_connected:
-            self.log_manager.log("MQTT not connected. Attempting to reconnect...")
+            self.log_mgr.log("MQTT not connected. Attempting to reconnect...")
             await self.reconnect()
         
         if not self.is_connected:
-            self.log_manager.log("Failed to reconnect to MQTT. Cannot publish data.")
+            self.log_mgr.log("Failed to reconnect to MQTT. Cannot publish data.")
             return False
+
+        self.log_mgr.log(f"MQTT Topics: {self.config.MQTT_TOPICS}")
+        self.log_mgr.log(f"Data to publish: {data}")
 
         try:
             for topic, subtopics in self.config.MQTT_TOPICS.items():
+                self.log_mgr.log(f"Processing topic: {topic}")
                 if topic in data:
                     for subtopic in subtopics:
                         if subtopic in data[topic]:
                             full_topic = f"{self.config.MQTT_CLIENT_NAME}/{topic}/{subtopic}"
                             message = str(data[topic][subtopic])
-                            self.log_manager.log(f"Publishing to {full_topic}: {message}")
+                            self.log_mgr.log(f"Attempting to publish to {full_topic}: {message}")
                             result = self.client.publish(full_topic, message)
+                            self.log_mgr.log(f"Publish result for {full_topic}: {result}")
                             if result != 0:
-                                self.log_manager.log(f"Failed to publish to {full_topic}. Result: {result}")
+                                self.log_mgr.log(f"Failed to publish to {full_topic}. Result: {result}")
                                 return False
             self.last_publish_time = utime.time()
-            self.log_manager.log("All data published to MQTT broker")
+            self.log_mgr.log("All data published to MQTT broker")
             return True
         except Exception as e:
-            self.log_manager.log(f"Failed to publish data: {e}")
+            self.log_mgr.log(f"Exception in publish_data: {e}")
             self.is_connected = False
             return False
+        finally:
+            self.log_mgr.log("Exiting publish_data method")
+
 
     async def subscribe_to_control_topics(self):
         if self.is_connected:
             try:
                 self.client.subscribe(b"picow/control/#")
-                self.log_manager.log("Subscribed to control topics")
+                self.log_mgr.log("Subscribed to control topics")
             except Exception as e:
-                self.log_manager.log(f"Failed to subscribe to control topics: {e}")
+                self.log_mgr.log(f"Failed to subscribe to control topics: {e}")
 
     def on_message(self, topic, msg):
-        self.log_manager.log(f"Received message on topic {topic}: {msg}")
+        self.log_mgr.log(f"Received message on topic {topic}: {msg}")
         # Handle incoming messages here
 
     async def check_messages(self):
@@ -73,7 +83,7 @@ class MQTTManager:
             try:
                 self.client.check_msg()
             except Exception as e:
-                self.log_manager.log(f"Error checking messages: {e}")
+                self.log_mgr.log(f"Error checking messages: {e}")
                 await self.reconnect()
 
     async def run(self):
