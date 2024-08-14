@@ -105,7 +105,7 @@ class PicoEnviroPlusDisplayMgr:
 
     async def trigger_watering(self):
         self.log_mgr.log("Manual watering triggered")
-        await self.m5_watering_unit.manual_water()
+        await self.m5_watering_unit.trigger_watering()
 
     def clear_logs(self):
         self.log_buffer.clear()

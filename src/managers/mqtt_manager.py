@@ -1,6 +1,5 @@
 import uasyncio
 from umqtt_simple import MQTTClient
-import ujson
 import utime
 
 class MQTTManager:
@@ -11,71 +10,71 @@ class MQTTManager:
         self.is_connected = False
         self.last_publish_time = 0
 
-    async def connect(self):
-        self.log_mgr.log("Initializing MQTT connection ...")
-        try:
-            self.client = MQTTClient(self.config.MQTT_CLIENT_NAME, self.config.MQTT_BROKER_ADDRESS, self.config.MQTT_BROKER_PORT)
-            self.client.set_callback(self.on_message)
-            self.client.connect()
-            self.is_connected = True
-            self.log_mgr.log(f"MQTT client connected as {self.config.MQTT_CLIENT_NAME}")
-            await self.subscribe_to_control_topics()
-        except Exception as e:
-            self.log_mgr.log(f"Failed to connect to MQTT broker: {e}")
-            self.is_connected = False
-
-    async def reconnect(self):
-        self.log_mgr.log("Attempting to reconnect to MQTT broker")
-        await self.connect()
-
     async def publish_data(self, data):
-        self.log_mgr.log("Entering publish_data method")
         if not self.is_connected:
-            self.log_mgr.log("MQTT not connected. Attempting to reconnect...")
+            self.log_mgr.log("MQTT not connected. Attempting to connect...")
             await self.reconnect()
         
         if not self.is_connected:
-            self.log_mgr.log("Failed to reconnect to MQTT. Cannot publish data.")
+            self.log_mgr.log("MQTT connection failed. Cannot publish data.")
             return False
-
-        self.log_mgr.log(f"MQTT Topics: {self.config.MQTT_TOPICS}")
-        self.log_mgr.log(f"Data to publish: {data}")
 
         try:
             for topic, subtopics in self.config.MQTT_TOPICS.items():
-                self.log_mgr.log(f"Processing topic: {topic}")
                 if topic in data:
                     for subtopic in subtopics:
                         if subtopic in data[topic]:
                             full_topic = f"{self.config.MQTT_CLIENT_NAME}/{topic}/{subtopic}"
                             message = str(data[topic][subtopic])
-                            self.log_mgr.log(f"Attempting to publish to {full_topic}: {message}")
-                            result = self.client.publish(full_topic, message)
-                            self.log_mgr.log(f"Publish result for {full_topic}: {result}")
-                            if result != 0:
-                                self.log_mgr.log(f"Failed to publish to {full_topic}. Result: {result}")
-                                return False
+                            try:
+                                result = self.client.publish(full_topic.encode(), message.encode())
+                            except Exception as e:
+                                self.log_mgr.log(f"Exception while publishing to {full_topic}: {e}")
+                        else:
+                            self.log_mgr.log(f"Subtopic {subtopic} not found in data for topic {topic}")
+                else:
+                    self.log_mgr.log(f"Topic {topic} not found in data")
+            
             self.last_publish_time = utime.time()
-            self.log_mgr.log("All data published to MQTT broker")
+            self.log_mgr.log("MQTT data published successful")
             return True
         except Exception as e:
             self.log_mgr.log(f"Exception in publish_data: {e}")
             self.is_connected = False
             return False
-        finally:
-            self.log_mgr.log("Exiting publish_data method")
+
+    async def reconnect(self):
+        self.log_mgr.log("Attempting to reconnect to MQTT broker")
+        try:
+            self.client.disconnect()
+        except:
+            pass
+        await self.connect()
+
+    async def connect(self):
+        self.log_mgr.log("MQTT connecting ...")
+        try:
+            self.client = MQTTClient(self.config.MQTT_CLIENT_NAME, self.config.MQTT_BROKER_ADDRESS, self.config.MQTT_BROKER_PORT)
+            self.client.set_callback(self.on_message)
+            self.client.connect()
+            self.is_connected = True
+            self.log_mgr.log(f"MQTT client connected as: {self.config.MQTT_CLIENT_NAME}")
+            await self.subscribe_to_control_topics()
+        except Exception as e:
+            self.log_mgr.log(f"Failed to connect to MQTT broker: {e}")
+            self.is_connected = False
 
 
     async def subscribe_to_control_topics(self):
         if self.is_connected:
             try:
                 self.client.subscribe(b"picow/control/#")
-                self.log_mgr.log("Subscribed to control topics")
+                self.log_mgr.log("MQTT control topics subscribed")
             except Exception as e:
                 self.log_mgr.log(f"Failed to subscribe to control topics: {e}")
 
     def on_message(self, topic, msg):
-        self.log_mgr.log(f"Received message on topic {topic}: {msg}")
+        self.log_mgr.log(f"MQTT message received on topic {topic}: {msg}")
         # Handle incoming messages here
 
     async def check_messages(self):

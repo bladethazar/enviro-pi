@@ -18,14 +18,14 @@ class WiFiManager:
         while max_wait > 0:
             if self.wlan.status() < 0 or self.wlan.status() >= 3:
                 break
-            self.log_manager.log("Waiting for WiFi connection...")
+            self.log_manager.log("WiFi connecting...")
             self.led.toggle()
             await uasyncio.sleep(1)
             max_wait -= 1
 
         if self.wlan.status() != 3:
             self.led.value(0)  # Turn off LED on connection failure
-            raise RuntimeError('WiFiManager    | WiFi connection failed.')
+            raise RuntimeError(' WiFi connection failed.')
         else:
             self.log_manager.log("WiFi connection successful.")
             self.led.value(1)  # Turn on LED to indicate connection

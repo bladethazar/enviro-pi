@@ -23,8 +23,8 @@ micropython.alloc_emergency_exception_buf(100)
 log_mgr = LogManager(PicoWConfig)
 system_mgr = SystemManager(PicoWConfig)
 data_mgr = DataManager(PicoWConfig)
-wifi_manager = WiFiManager(PicoWConfig, log_mgr)
-mqtt_manager = MQTTManager(PicoWConfig, log_mgr)
+wifi_mgr = WiFiManager(PicoWConfig, log_mgr)
+mqtt_mgr = MQTTManager(PicoWConfig, log_mgr)
 
 # Initialize components
 m5_watering_unit = M5WateringUnit(PicoWConfig, log_mgr)
@@ -36,9 +36,6 @@ enviro_plus_led = enviro_plus.get_led()
 enviro_plus_display_mgr = PicoEnviroPlusDisplayMgr(enviro_plus, log_mgr, data_mgr, m5_watering_unit, system_mgr)
 enviro_plus_display_mgr.setup_display(PicoWConfig)
 
-# Connect to WiFi and MQTT
-# wifi_manager.connect()
-# mqtt_manager.connect()
 
 # Global variables
 last_mqtt_publish = 0
@@ -120,48 +117,38 @@ async def update_display(sensor_data):
 async def handle_mqtt_publishing(sensor_data): 
     global last_mqtt_publish
     current_time = utime.time()
-    log_mgr.log(f"Current time: {current_time}, Last publish time: {last_mqtt_publish}")
-    log_mgr.log(f"Time since last publish: {current_time - last_mqtt_publish}")
-    log_mgr.log(f"MQTT update interval: {PicoWConfig.MQTT_UPDATE_INTERVAL}")
     
     if current_time - last_mqtt_publish >= PicoWConfig.MQTT_UPDATE_INTERVAL:
-        log_mgr.log("MQTT publishing interval reached")
-        if not mqtt_manager.is_connected:
+        if not mqtt_mgr.is_connected:
             log_mgr.log("MQTT not connected, attempting to connect...")
-            await mqtt_manager.connect()
-        else:
-            log_mgr.log("Using existing MQTT connection")
-            
-        try:
-            log_mgr.log("Preparing MQTT data...")
-            enviro_plus_data = {
-                "temperature": sensor_data['temperature'],
-                "humidity": sensor_data['humidity'],
-                "pressure": sensor_data['pressure'],
-                "gas": sensor_data['gas'],
-                "lux": sensor_data['lux'],
-                "mic": sensor_data['mic']
-            }
-            prepared_mqtt_data = data_mgr.prepare_mqtt_sensor_data_for_publishing(
-                m5_watering_unit.get_current_data(),
-                enviro_plus_data,
-                system_mgr.get_system_data()
-            )
-            log_mgr.log("MQTT data prepared, attempting to publish...")
-            publish_result = await mqtt_manager.publish_data(prepared_mqtt_data)
-            log_mgr.log(f"Publish result: {publish_result}")
-            if publish_result:
-                last_mqtt_publish = current_time
-                enviro_plus_led.set_rgb(0, 50, 0)
-                log_mgr.log("MQTT data published successfully")
-            else:
+            await mqtt_mgr.connect()
+        
+        if mqtt_mgr.is_connected:
+            try:
+                enviro_plus_data = {
+                    "temperature": sensor_data['temperature'],
+                    "humidity": sensor_data['humidity'],
+                    "pressure": sensor_data['pressure'],
+                    "gas": sensor_data['gas'],
+                    "lux": sensor_data['lux'],
+                    "mic": sensor_data['mic']
+                }
+                prepared_mqtt_data = data_mgr.prepare_mqtt_sensor_data_for_publishing(
+                    m5_watering_unit.get_current_data(),
+                    enviro_plus_data,
+                    system_mgr.get_system_data()
+                )
+                publish_result = await mqtt_mgr.publish_data(prepared_mqtt_data)
+                if publish_result:
+                    last_mqtt_publish = current_time
+                    enviro_plus_led.set_rgb(0, 50, 0)
+                else:
+                    enviro_plus_led.set_rgb(255, 0, 0)
+            except Exception as e:
+                log_mgr.log(f"MQTT publishing error: {e}")
                 enviro_plus_led.set_rgb(255, 0, 0)
-                log_mgr.log("Failed to publish MQTT data")
-        except Exception as e:
-            log_mgr.log(f"MQTT publishing error: {e}")
-            enviro_plus_led.set_rgb(255, 0, 0)
-    else:
-        log_mgr.log("MQTT publishing interval not reached yet")
+        else:
+            log_mgr.log("MQTT connection failed, skipping publish")
 
 async def startup_sequence():
     try:
@@ -169,8 +156,8 @@ async def startup_sequence():
         log_mgr.enable_buffering()
 
         # Initialize WiFi
-        log_mgr.log("Initializing WiFi...")
-        await wifi_manager.connect()
+        log_mgr.log("Initializing connections...")
+        await wifi_mgr.connect()
         
         enviro_plus.set_display_mode("Watering")  # Set Watering Mode as default
         await uasyncio.sleep_ms(100)
@@ -209,14 +196,10 @@ async def main_loop():
             enviro_plus.check_buttons()
             await update_display(sensor_data)
             
-            print(sensor_data)
-
-            log_mgr.log("About to check MQTT publishing...")
             if sensor_data.get('status', 0) & STATUS_HEATER_STABLE:
-                log_mgr.log("Heater stable, calling handle_mqtt_publishing...")
                 await handle_mqtt_publishing(sensor_data)
             else:
-                log_mgr.log("Heater not stable, skipping MQTT publishing")
+                log_mgr.log("Sensor heater not stable, skipping MQTT publishing")
 
             wdt.feed()
             await uasyncio.sleep_ms(1000)
