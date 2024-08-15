@@ -1,5 +1,7 @@
 import asyncio
+import uasyncio
 import gc
+import utime
 
 
 class PicoEnviroPlusDisplayMgr:
@@ -23,9 +25,12 @@ class PicoEnviroPlusDisplayMgr:
         # Log settings
         self.log_speed = 1
         self.log_scroll_position = 0
-        self.lines_per_screen = 15
         self.line_height = 16
-        self.log_buffer = []
+        self.button_label_height = 20  # Height of the button label area
+        
+        # Calculate available display height for logs
+        self.log_display_height = self.DISPLAY_HEIGHT - 30 - self.button_label_height  # 30 for title
+        self.lines_per_screen = self.log_display_height // self.line_height
         
         # Moisture history
         self.moisture_history = []
@@ -49,7 +54,7 @@ class PicoEnviroPlusDisplayMgr:
                 "A": (self.toggle_backlight, "Backlight"),
                 "B": (self.clear_logs, "Clear logs"),
                 "X": (self.cycle_display_mode, "Next"),
-                "Y": (self.toggle_log_speed, "Speed")
+                "Y": (self.clear_logs, "Clear logs")
             },
             "System": {
                 "A": (self.toggle_backlight, "Backlight"),
@@ -84,11 +89,6 @@ class PicoEnviroPlusDisplayMgr:
         self.display.set_pen(self.BLACK)
         self.display.clear()
         
-    def set_log_speed(self, speed):
-        """Set the logging speed (lines per update)"""
-        self.log_speed = max(1, min(speed, self.lines_per_screen // 2))
-        self.log_mgr.log(f"Log speed set to {self.log_speed}")
-
     def toggle_backlight(self):
         self.display_backlight_on = not self.display_backlight_on
         self.display.set_backlight(0.8 if self.display_backlight_on else 0)
@@ -107,15 +107,6 @@ class PicoEnviroPlusDisplayMgr:
         self.log_mgr.log("Manual watering triggered")
         await self.m5_watering_unit.trigger_watering()
 
-    def clear_logs(self):
-        self.log_buffer.clear()
-        self.log_mgr.clear_logs()
-        self.log_mgr.log("Logs cleared")
-
-    def toggle_log_speed(self):
-        self.log_speed = 3 if self.log_speed == 1 else 1
-        self.log_mgr.log(f"Log speed set to {self.log_speed}")
-
     async def handle_button_press(self, button):
         if self.enviro_plus.display_mode in self.button_config and button in self.button_config[self.enviro_plus.display_mode]:
             action, _ = self.button_config[self.enviro_plus.display_mode][button]
@@ -132,10 +123,10 @@ class PicoEnviroPlusDisplayMgr:
         scale = 1
 
         # Draw top line
-        self.display.line(0, 20, self.DISPLAY_WIDTH, 20, 1)
+        self.display.line(0, 20, self.DISPLAY_WIDTH,  self.button_label_height, 1)
 
         # Draw bottom line
-        self.display.line(0, self.DISPLAY_HEIGHT - 21, self.DISPLAY_WIDTH, self.DISPLAY_HEIGHT - 21, 1)
+        self.display.line(0, self.DISPLAY_HEIGHT -  (self.button_label_height + 1), self.DISPLAY_WIDTH, self.DISPLAY_HEIGHT - (self.button_label_height + 1), 1)
 
         for button, (_, label) in self.button_config[self.enviro_plus.display_mode].items():
             if button == 'A' and label:
@@ -254,17 +245,53 @@ class PicoEnviroPlusDisplayMgr:
         self.display.update()
 
     async def update_log_display(self):
+        self.clear_display()
         self.draw_display_mode_title("Logs")
         
-        # Display logs
-        y_offset = 35
-        logs = self.log_mgr.get_logs()[-20:]  # Get the latest 20 log lines
-        for log in logs:
-            self.display.text(log, 5, y_offset, self.DISPLAY_WIDTH, scale=1)
-            y_offset += self.line_height
+        self.display.set_pen(self.WHITE)
+        self.display.set_font("bitmap6")
+        scale = 1.5
+
+        logs = self.log_mgr.get_logs()
+        total_logs = len(logs)
         
+        start_index = max(0, total_logs - self.lines_per_screen)
+        visible_logs = logs[start_index:]
+
+        y_offset = 30  # Start below the title
+
+        for log in visible_logs:
+            self.display.text(log, 5, y_offset, self.DISPLAY_WIDTH - 10, scale=scale)
+            y_offset += self.line_height
+            
         self.draw_button_labels()
         self.display.update()
+
+    async def continuous_log_update(self):
+        try:
+            while self.enviro_plus.display_mode == "Log":
+                await self.update_log_display()
+                await uasyncio.sleep(1)  # Update every second
+        except uasyncio.CancelledError:
+            # Perform any necessary cleanup
+            await self.update_log_display()  # Final update before exiting
+            raise  # Re-raise the CancelledError to properly handle task cancellation
+
+
+    def clear_logs(self):
+        self.log_mgr.clear_logs()
+        self.log_mgr.log("Logs cleared")
+
+    def toggle_log_speed(self):
+        self.log_speed = 3 if self.log_speed == 1 else 1
+        self.log_mgr.log(f"Log speed set to {self.log_speed}")
+
+    async def scroll_logs(self):
+        while self.enviro_plus.display_mode == "Log":
+            total_logs = len(self.log_mgr.get_logs())
+            self.log_scroll_position = (self.log_scroll_position + self.log_speed) % max(1, total_logs - self.lines_per_screen + 1)
+            await self.update_log_display()
+            await asyncio.sleep(0.5)  # Adjust for smooth scrolling
 
     async def update_system_display(self, system_data):
         self.draw_display_mode_title("System")
@@ -293,14 +320,6 @@ class PicoEnviroPlusDisplayMgr:
         if not self.moisture_history:
             return 0, 0, 0
         return min(self.moisture_history), max(self.moisture_history), sum(self.moisture_history) / len(self.moisture_history)
-
-    async def scroll_logs(self):
-        while self.display_mode == "Log":
-            self.log_scroll_position += self.log_speed
-            if self.log_scroll_position >= len(self.log_mgr.get_logs()):
-                self.log_scroll_position = 0
-            await self.update_log_display()
-            await asyncio.sleep(1)  # Adjust the sleep time to control scroll speed
 
     def cleanup(self):
         self.clear_display()

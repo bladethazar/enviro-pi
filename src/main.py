@@ -142,6 +142,9 @@ async def handle_mqtt_publishing(sensor_data):
                 if publish_result:
                     last_mqtt_publish = current_time
                     enviro_plus_led.set_rgb(0, 50, 0)
+                    uasyncio.sleep(0.5)
+                    enviro_plus_led.set_rgb(0, 0, 0)
+                    
                 else:
                     enviro_plus_led.set_rgb(255, 0, 0)
             except Exception as e:
@@ -151,32 +154,47 @@ async def handle_mqtt_publishing(sensor_data):
             log_mgr.log("MQTT connection failed, skipping publish")
 
 async def startup_sequence():
+    display_task = None
     try:
-        log_mgr.log("Starting startup sequence...")
         log_mgr.enable_buffering()
+        log_mgr.log("Starting startup sequence...")
+        enviro_plus.set_display_mode("Log")  # Set Log Mode for startup
 
         # Initialize WiFi
         log_mgr.log("Initializing connections...")
-        await wifi_mgr.connect()
+        wifi_task = uasyncio.create_task(wifi_mgr.connect())
         
-        enviro_plus.set_display_mode("Watering")  # Set Watering Mode as default
-        await uasyncio.sleep_ms(100)
-
-        enviro_plus_display_mgr.set_log_speed(1)
-
-        await enviro_plus_display_mgr.update_log_display()
-        await uasyncio.sleep(1)
+        # Start continuous log update
+        display_task = uasyncio.create_task(enviro_plus_display_mgr.continuous_log_update())
         
-        await enviro_plus_display_mgr.update_log_display()
-        await uasyncio.sleep(2)  # Display the final message for 2 seconds
+        # Wait for WiFi task to complete with a timeout
+        try:
+            await uasyncio.wait_for(wifi_task, 30)  # 30 seconds timeout
+            wdt.feed()  # Feed the watchdog after WiFi connection attempt
+        except uasyncio.TimeoutError:
+            log_mgr.log("WiFi connection timed out")
         
-        log_mgr.disable_buffering()
-        log_mgr.log("Startup sequence finished successfully.")
+        # Allow some time for final logs to be displayed
+        await uasyncio.sleep(2)
+        
+        log_mgr.log("Startup sequence finished")
+        enviro_plus.set_display_mode("Watering")  # Set Watering Mode as default after startup
+    except RuntimeError as e:
+        log_mgr.log(f"WiFi connection error: {e}")
     except Exception as e:
         log_mgr.log(f"Error in startup sequence: {e}")
         print(f"Error in startup sequence: {e}")
         sys.print_exception(e)
-        raise
+    finally:
+        # Ensure display task is always cancelled
+        if display_task:
+            display_task.cancel()
+            try:
+                await display_task
+            except uasyncio.CancelledError:
+                pass
+        log_mgr.log("Startup sequence cleanup completed")
+        wdt.feed()  # Final watchdog feed before exiting startup sequence
 
 async def main_loop():
     log_mgr.log("Starting main loop...")
@@ -195,7 +213,11 @@ async def main_loop():
 
             await handle_watering()
             enviro_plus.check_buttons()
-            await update_display(sensor_data)
+            
+            if enviro_plus.display_mode == "Log":
+                await enviro_plus_display_mgr.update_log_display()
+            else:
+                await update_display(sensor_data)
             
             if sensor_data.get('status', 0) & STATUS_HEATER_STABLE:
                 await handle_mqtt_publishing(sensor_data)
@@ -203,7 +225,7 @@ async def main_loop():
                 log_mgr.log("Sensor heater not stable, skipping MQTT publishing")
 
             wdt.feed()
-            await uasyncio.sleep_ms(1000)
+            await uasyncio.sleep(1)
 
         except Exception as e:
             log_mgr.log(f"Error in main loop: {e}")

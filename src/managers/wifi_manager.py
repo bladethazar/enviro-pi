@@ -14,7 +14,7 @@ class WiFiManager:
         self.wlan.active(True)
         self.wlan.connect(self.ssid, self.wifi_password)
 
-        max_wait = 10
+        max_wait = 20  # Increased from 10 to 20 for more connection attempts
         while max_wait > 0:
             if self.wlan.status() < 0 or self.wlan.status() >= 3:
                 break
@@ -25,7 +25,7 @@ class WiFiManager:
 
         if self.wlan.status() != 3:
             self.led.value(0)  # Turn off LED on connection failure
-            raise RuntimeError(' WiFi connection failed.')
+            raise RuntimeError('WiFi connection failed.')
         else:
             self.log_manager.log("WiFi connection successful.")
             self.led.value(1)  # Turn on LED to indicate connection
@@ -34,7 +34,12 @@ class WiFiManager:
 
     async def ensure_connection(self):
         if not self.wlan.isconnected():
-            await self.connect()
+            try:
+                await self.connect()
+            except RuntimeError as e:
+                self.log_manager.log(f"WiFi connection error: {e}")
+                return False
+        return True
 
     def is_connected(self):
         return self.wlan.isconnected()

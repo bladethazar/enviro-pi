@@ -2,7 +2,7 @@ import utime
 
 class LogManager:
     def __init__(self, config):
-        self.buffer_size = min(config.LOG_MANAGER_BUFFER_SIZE, 20)
+        self.buffer_size = min(config.LOG_MANAGER_BUFFER_SIZE, 15)
         self.buffer = []
         self.buffering_enabled = True
 

@@ -106,13 +106,15 @@ class PicoEnviroPlus:
         self.display_backlight_on = not self.display_backlight_on
         self.display.set_backlight(self.config.ENVIRO_PLUS_DISPLAY_BRIGHTNESS if self.display_backlight_on else 0)
         self.log_manager.log(f"Display backlight {'on' if self.display_backlight_on else 'off'}")
-
+        
     def handle_button_press(self, button):
         if button == 'A':
             self.toggle_backlight()
         elif button == 'B':
             if self.display_mode == "Watering":
                 self.reset_water_tank_capacity()
+            if self.display_mode == "Logs":
+                self.log_manager.clear_logs()
             else:
                 self.cycle_display_mode()
         elif button == 'X':
@@ -121,6 +123,8 @@ class PicoEnviroPlus:
             if self.display_mode == "Watering":
                 self.trigger_watering()
                 self.log_manager.log("Manual watering triggered by button press")
+            if self.display_mode == "Logs":
+                self.log_manager.clear_logs()
             else:
                 self.cycle_display_mode()
 
