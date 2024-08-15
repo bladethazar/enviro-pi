@@ -84,9 +84,7 @@ class M5WateringUnit:
     async def check_moisture_and_watering_status(self):
         self.log_manager.log("Starting moisture and watering status check")
         with self.lock:
-            self.log_manager.log("Acquired lock")
             self.current_moisture = self.read_moisture()
-            self.log_manager.log(f"Current moisture read: {self.current_moisture}")
             if self.current_moisture is None:
                 self.log_manager.log("Failed to read moisture. Skipping watering check.")
                 return
@@ -99,7 +97,7 @@ class M5WateringUnit:
                     self.get_water_tank_capacity_left() > 0 and 
                     not self.watering_cycle_pause_flag):
                     self.log_manager.log("Starting watering")
-                    await self.trigger_watering()
+                    self.trigger_watering()
                 else:
                     self.log_manager.log("Cannot start watering")
                     await self.handle_watering_limits()
@@ -108,11 +106,9 @@ class M5WateringUnit:
                 self.watering_cycles = 0
             self.log_manager.log("Moisture and watering status check completed")
 
-    async def trigger_watering(self):
-        self.log_manager.log(f"Start watering for {self.WATERING_DURATION} seconds...")
-        self.is_watering = True
-        self.watering_cycles += 1
-        await self.control_pump(self.WATERING_DURATION)
+    def trigger_watering(self):
+        self.log_manager.log(f"Manual watering triggered for {self.WATERING_DURATION} seconds.")
+        uasyncio.create_task(self.control_pump(self.WATERING_DURATION))
 
     async def handle_watering_limits(self):
         if self.watering_cycles >= self.WATERING_MAX_CYCLES:
@@ -128,14 +124,6 @@ class M5WateringUnit:
             if utime.ticks_diff(utime.ticks_ms(), self.watering_pause_start_time) >= self.WATERING_PAUSE_DURATION * 1000:
                 self.watering_cycle_pause_flag = False
                 self.log_manager.log("Watering cycle pause finished.")
-
-    async def manual_water(self, duration=None):
-        if duration is None:
-            duration = self.WATERING_DURATION
-        
-        self.log_manager.log(f"Manual watering triggered for {duration} seconds.")
-        await self.control_pump(duration)
-        self.log_manager.log("Manual watering completed.")
 
     async def run(self):
         while True:

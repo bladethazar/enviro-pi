@@ -148,6 +148,18 @@ class PicoEnviroPlusDisplayMgr:
                 self.display.text(label, self.DISPLAY_WIDTH - text_width - 5, self.DISPLAY_HEIGHT - 15, scale=scale)
             elif button == 'Y' and label:
                 self.display.text(label, 5, self.DISPLAY_HEIGHT - 15, scale=scale)
+                
+    def draw_display_mode_title(self, title):
+        # Clear the display
+        self.display.set_pen(self.BLACK)
+        self.display.clear()
+
+        # Display centered title
+        title_scale = 2.5
+        title_width = self.display.measure_text(title, scale=title_scale)
+        title_x = (self.DISPLAY_WIDTH - title_width) // 2
+        self.display.set_pen(self.WHITE)
+        self.display.text(title, title_x, 5, scale=title_scale)
 
     # Placeholder methods for new button actions
     def read_all_sensors(self):
@@ -167,12 +179,7 @@ class PicoEnviroPlusDisplayMgr:
         # Implement MQTT reset logic
         
     async def update_sensor_display(self, temperature, humidity, pressure, lux, gas, mic):
-        self.clear_display()
-        
-        # Display title
-        self.display.set_pen(self.WHITE)
-        self.display.text("Sensor Mode", 5, 5, self.DISPLAY_WIDTH, scale=2)
-        self.display.line(0, 25, self.DISPLAY_WIDTH, 25, 1)  # Line after title
+        self.draw_display_mode_title("Sensors")
         
         # Display sensor data
         y_offset = 35
@@ -212,12 +219,8 @@ class PicoEnviroPlusDisplayMgr:
         self.display.update()
 
     async def update_watering_display(self, watering_unit_data):
-        self.clear_display()
-        
-        # Display title
-        self.display.set_pen(self.WHITE)
-        self.display.text("Watering Mode", 5, 5, self.DISPLAY_WIDTH, scale=2)
-        self.display.line(0, 25, self.DISPLAY_WIDTH, 25, 1)  # Line after title
+        # Clear the display
+        self.draw_display_mode_title("H²O")
         
         # Display watering data
         y_offset = 35
@@ -251,12 +254,7 @@ class PicoEnviroPlusDisplayMgr:
         self.display.update()
 
     async def update_log_display(self):
-        self.clear_display()
-        
-        # Display title
-        self.display.set_pen(self.WHITE)
-        self.display.text("Log Mode", 5, 5, self.DISPLAY_WIDTH, scale=2)
-        self.display.line(0, 25, self.DISPLAY_WIDTH, 25, 1)  # Line after title
+        self.draw_display_mode_title("Logs")
         
         # Display logs
         y_offset = 35
@@ -269,12 +267,7 @@ class PicoEnviroPlusDisplayMgr:
         self.display.update()
 
     async def update_system_display(self, system_data):
-        self.clear_display()
-        
-        # Display title
-        self.display.set_pen(self.WHITE)
-        self.display.text("System Mode", 5, 5, self.DISPLAY_WIDTH, scale=2)
-        self.display.line(0, 25, self.DISPLAY_WIDTH, 25, 1)  # Line after title
+        self.draw_display_mode_title("System")
         
         # Display system data
         y_offset = 35

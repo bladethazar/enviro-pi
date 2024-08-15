@@ -120,6 +120,7 @@ class PicoEnviroPlus:
         elif button == 'Y':
             if self.display_mode == "Watering":
                 self.trigger_watering()
+                self.log_manager.log("Manual watering triggered by button press")
             else:
                 self.cycle_display_mode()
 

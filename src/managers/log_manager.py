@@ -9,7 +9,7 @@ class LogManager:
     def log(self, message):
         timestamp = utime.localtime()
         formatted_time = "{:02d}:{:02d}:{:02d}".format(timestamp[3], timestamp[4], timestamp[5])
-        log_entry = f"{formatted_time} - {message}"
+        log_entry = f"{formatted_time} | {message}"
         
         if self.buffering_enabled:
             if len(self.buffer) >= self.buffer_size:

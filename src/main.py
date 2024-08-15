@@ -181,6 +181,7 @@ async def startup_sequence():
 async def main_loop():
     log_mgr.log("Starting main loop...")
     await startup_sequence()
+    uasyncio.create_task(enviro_plus.run())
     while True:
         try:
             gc.collect()
