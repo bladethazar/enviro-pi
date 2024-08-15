@@ -107,15 +107,15 @@ class PicoEnviroPlusDisplayMgr:
         self.log_mgr.log("Manual watering triggered")
         await self.m5_watering_unit.trigger_watering()
 
-    async def handle_button_press(self, button):
-        if self.enviro_plus.display_mode in self.button_config and button in self.button_config[self.enviro_plus.display_mode]:
-            action, _ = self.button_config[self.enviro_plus.display_mode][button]
-            if action == self.trigger_watering:
-                await self.trigger_watering()
-            elif action == self.cycle_display_mode:
-                self.cycle_display_mode()
-            else:
-                action()
+    # async def handle_button_press(self, button):
+    #     if self.enviro_plus.display_mode in self.button_config and button in self.button_config[self.enviro_plus.display_mode]:
+    #         action, _ = self.button_config[self.enviro_plus.display_mode][button]
+    #         if action == self.trigger_watering:
+    #             await self.trigger_watering()
+    #         elif action == self.cycle_display_mode:
+    #             self.cycle_display_mode()
+    #         else:
+    #             action()
 
     def draw_button_labels(self):
         self.display.set_pen(self.WHITE)
@@ -123,10 +123,10 @@ class PicoEnviroPlusDisplayMgr:
         scale = 1
 
         # Draw top line
-        self.display.line(0, 20, self.DISPLAY_WIDTH,  self.button_label_height, 1)
+        self.display.line(0, 20, self.DISPLAY_WIDTH, self.button_label_height, 1)
 
         # Draw bottom line
-        self.display.line(0, self.DISPLAY_HEIGHT -  (self.button_label_height + 1), self.DISPLAY_WIDTH, self.DISPLAY_HEIGHT - (self.button_label_height + 1), 1)
+        self.display.line(0, self.DISPLAY_HEIGHT - (self.button_label_height + 1), self.DISPLAY_WIDTH, self.DISPLAY_HEIGHT - (self.button_label_height + 1), 1)
 
         for button, (_, label) in self.button_config[self.enviro_plus.display_mode].items():
             if button == 'A' and label:
@@ -135,10 +135,10 @@ class PicoEnviroPlusDisplayMgr:
                 text_width = self.display.measure_text(label, scale=scale)
                 self.display.text(label, self.DISPLAY_WIDTH - text_width - 5, 5, scale=scale)
             elif button == 'B' and label:
+                self.display.text(label, 5, self.DISPLAY_HEIGHT - 15, scale=scale)
+            elif button == 'Y' and label:
                 text_width = self.display.measure_text(label, scale=scale)
                 self.display.text(label, self.DISPLAY_WIDTH - text_width - 5, self.DISPLAY_HEIGHT - 15, scale=scale)
-            elif button == 'Y' and label:
-                self.display.text(label, 5, self.DISPLAY_HEIGHT - 15, scale=scale)
                 
     def draw_display_mode_title(self, title):
         # Clear the display
