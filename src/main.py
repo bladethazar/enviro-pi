@@ -36,6 +36,8 @@ enviro_plus_led = enviro_plus.get_led()
 enviro_plus_display_mgr = PicoEnviroPlusDisplayMgr(enviro_plus, log_mgr, data_mgr, m5_watering_unit, system_mgr)
 enviro_plus_display_mgr.setup_display(PicoWConfig)
 
+# Set display manager in enviro_plus
+enviro_plus.set_display_manager(enviro_plus_display_mgr)
 
 # Global variables
 last_mqtt_publish = 0

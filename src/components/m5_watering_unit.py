@@ -106,9 +106,9 @@ class M5WateringUnit:
                 self.watering_cycles = 0
             self.log_manager.log("Moisture and watering status check completed")
 
-    def trigger_watering(self):
+    async def trigger_watering(self):
         self.log_manager.log(f"Manual watering triggered for {self.WATERING_DURATION} seconds.")
-        uasyncio.create_task(self.control_pump(self.WATERING_DURATION))
+        await self.control_pump(self.WATERING_DURATION)
 
     async def handle_watering_limits(self):
         if self.watering_cycles >= self.WATERING_MAX_CYCLES:

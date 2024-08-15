@@ -1,3 +1,4 @@
+import asyncio
 import utime
 import uasyncio
 from machine import Pin, ADC
@@ -13,6 +14,7 @@ class PicoEnviroPlus:
     def __init__(self, config, log_manager, reset_water_tank_capacity, trigger_watering):
         self.config = config
         self.log_manager = log_manager
+        self.display_manager = None
         self.reset_water_tank_capacity = reset_water_tank_capacity
         self.trigger_watering = trigger_watering
 
@@ -88,6 +90,9 @@ class PicoEnviroPlus:
         if utime.ticks_diff(utime.ticks_ms(), self.last_sensor_read) > 1000:
             return self.read_sensors()
         return self.sensor_data
+    
+    def set_display_manager(self, display_mgr):
+        self.display_manager = display_mgr
 
     def set_display_mode(self, mode):
         if mode in self.display_modes:
@@ -107,32 +112,42 @@ class PicoEnviroPlus:
         self.display.set_backlight(self.config.ENVIRO_PLUS_DISPLAY_BRIGHTNESS if self.display_backlight_on else 0)
         self.log_manager.log(f"Display backlight {'on' if self.display_backlight_on else 'off'}")
         
-    def handle_button_press(self, button):
-        if button == 'A':
-            self.toggle_backlight()
-        elif button == 'B':
-            if self.display_mode == "Watering":
-                self.reset_water_tank_capacity()
-            if self.display_mode == "Logs":
-                self.log_manager.clear_logs()
-            else:
-                self.cycle_display_mode()
-        elif button == 'X':
-            self.cycle_display_mode()
-        elif button == 'Y':
-            if self.display_mode == "Watering":
-                self.trigger_watering()
-                self.log_manager.log("Manual watering triggered by button press")
-            if self.display_mode == "Logs":
-                self.log_manager.clear_logs()
-            else:
-                self.cycle_display_mode()
+
+    async def handle_button_press(self, button):
+        if self.display_manager is None:
+            self.log_manager.log("Display manager not set")
+            return
+
+        current_mode = self.display_mode
+        if current_mode not in self.display_manager.button_config:
+            self.log_manager.log(f"Invalid display mode: {current_mode}")
+            return
+
+        button_actions = self.display_manager.button_config.get(current_mode, {})
+        action_tuple = button_actions.get(button)
+
+        if action_tuple is None:
+            self.log_manager.log(f"No action defined for button {button} in mode {current_mode}")
+            return
+
+        action = action_tuple[0]  # The first element of the tuple is the action
+
+        try:
+            if action == self.display_manager.trigger_watering:
+                await self.trigger_watering()
+            elif callable(action):
+                result = action()
+                if hasattr(result, '__await__'):
+                    await result
+        except Exception as e:
+            self.log_manager.log(f"Error executing button action: {e}")
 
     def check_buttons(self):
         for button, obj in self.buttons.items():
             if obj.read():
-                self.handle_button_press(button)
+                uasyncio.create_task(self.handle_button_press(button))
                 utime.sleep_ms(200)  # Debounce
+
 
     def set_led(self, r, g, b):
         self.led.set_rgb(r, g, b)
