@@ -9,6 +9,10 @@ class MQTTManager:
         self.client = None
         self.is_connected = False
         self.last_publish_time = 0
+        self.system_manager = None
+        
+    def set_system_manager(self, system_manager):
+        self.system_manager = system_manager
 
     async def publish_data(self, data):
         if not self.is_connected:
@@ -20,6 +24,8 @@ class MQTTManager:
             return False
 
         try:
+            if self.system_manager:
+                self.system_manager.start_processing("mqtt_publish")
             for topic, subtopics in self.config.MQTT_TOPICS.items():
                 if topic in data:
                     for subtopic in subtopics:
@@ -29,6 +35,8 @@ class MQTTManager:
                             try:
                                 result = self.client.publish(full_topic.encode(), message.encode())
                             except Exception as e:
+                                if self.system_manager:
+                                    self.system_manager.add_error("mqtt_publish")
                                 self.log_mgr.log(f"Exception while publishing to {full_topic}: {e}")
                         else:
                             self.log_mgr.log(f"Subtopic {subtopic} not found in data for topic {topic}")
@@ -36,10 +44,14 @@ class MQTTManager:
                     self.log_mgr.log(f"Topic {topic} not found in data")
             
             self.last_publish_time = utime.time()
+            if self.system_manager:
+                self.system_manager.stop_processing("mqtt_publish")
             self.log_mgr.log("MQTT data published successful")
             return True
         except Exception as e:
             self.log_mgr.log(f"Exception in publish_data: {e}")
+            if self.system_manager:
+                self.system_manager.add_error("mqtt_publish")
             self.is_connected = False
             return False
 
@@ -52,6 +64,8 @@ class MQTTManager:
         await self.connect()
 
     async def connect(self):
+        if self.system_manager:
+            self.system_manager.start_processing("mqtt_connect")
         self.log_mgr.log("MQTT connecting ...")
         try:
             self.client = MQTTClient(self.config.MQTT_CLIENT_NAME, self.config.MQTT_BROKER_ADDRESS, self.config.MQTT_BROKER_PORT)
@@ -60,9 +74,14 @@ class MQTTManager:
             self.is_connected = True
             self.log_mgr.log(f"MQTT client connected as: {self.config.MQTT_CLIENT_NAME}")
             await self.subscribe_to_control_topics()
+            if self.system_manager:
+                self.system_manager.stop_processing("mqtt_connect")
         except Exception as e:
             self.log_mgr.log(f"Failed to connect to MQTT broker: {e}")
             self.is_connected = False
+            if self.system_manager:
+                self.system_manager.add_error("mqtt_connection")
+                self.system_manager.stop_processing("mqtt_connect")
 
 
     async def subscribe_to_control_topics(self):
