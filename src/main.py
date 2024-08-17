@@ -41,7 +41,7 @@ enviro_plus_led = enviro_plus.get_led()
 system_mgr.set_led(enviro_plus_led)
 
 # Init enviro+ display manager
-enviro_plus_display_mgr = PicoEnviroPlusDisplayMgr(enviro_plus, log_mgr, data_mgr, m5_watering_unit, system_mgr)
+enviro_plus_display_mgr = PicoEnviroPlusDisplayMgr(PicoWConfig, enviro_plus, log_mgr, data_mgr, m5_watering_unit, system_mgr)
 enviro_plus_display_mgr.setup_display(PicoWConfig)
 
 # Set display manager in enviro_plus
