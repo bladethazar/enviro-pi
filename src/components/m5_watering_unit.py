@@ -7,6 +7,7 @@ import gc
 class M5WateringUnit:
     def __init__(self, config, log_manager):
         self.log_manager = log_manager
+        self.system_manager = None
         self.config = config
         
         # Initialize pins
@@ -37,6 +38,9 @@ class M5WateringUnit:
         
         self.log_manager.log("Initialized M5WateringUnit successfully!")
 
+    def set_system_manager(self, system_manager):
+        self.system_manager = system_manager
+
     def read_moisture(self):
         try:
             raw_value = self.moisture_sensor.read_u16()
@@ -49,6 +53,8 @@ class M5WateringUnit:
 
     async def control_pump(self, duration):
         try:
+            if self.system_manager:
+                self.system_manager.start_processing("watering")
             self.water_pump.on()
             await uasyncio.sleep(duration)
             self.water_pump.off()
@@ -56,8 +62,12 @@ class M5WateringUnit:
             water_used = (duration / 60) * self.WATER_PUMP_FLOW_RATE
             self.water_used += water_used
             self.log_manager.log(f"Watered for {duration}s, used {water_used:.2f}ml")
+            if self.system_manager:
+                self.system_manager.stop_processing("watering")
         except Exception as e:
             self.log_manager.log(f"Error controlling pump: {e}")
+            if self.system_manager:
+                self.system_manager.add_error("watering")
             self.water_pump.off()  # Ensure pump is off in case of error
         finally:
             self.is_watering = False
@@ -87,6 +97,8 @@ class M5WateringUnit:
             self.current_moisture = self.read_moisture()
             if self.current_moisture is None:
                 self.log_manager.log("Failed to read moisture. Skipping watering check.")
+                if self.system_manager:
+                    self.system_manager.add_error("moisture_read")
                 return
 
             self.log_manager.log(f"Soil moisture level: {self.current_moisture:.2f}%")

@@ -14,6 +14,7 @@ class PicoEnviroPlus:
     def __init__(self, config, log_manager, reset_water_tank_capacity, trigger_watering):
         self.config = config
         self.log_manager = log_manager
+        self.system_manager = None
         self.display_manager = None
         self.reset_water_tank_capacity = reset_water_tank_capacity
         self.trigger_watering = trigger_watering
@@ -54,6 +55,9 @@ class PicoEnviroPlus:
 
         self.log_manager.log("PicoEnviroPlus initialized successfully")
 
+    def set_system_manager(self, system_manager):
+        self.system_manager = system_manager
+
     def init_sensors(self):
         try:
             i2c = PimoroniI2C(sda=4, scl=5)
@@ -67,6 +71,8 @@ class PicoEnviroPlus:
 
     def read_sensors(self):
         try:
+            if self.system_manager:
+                self.system_manager.start_processing("reading_sensors")
             bme_data = self.bme.read()
             ltr_data = self.ltr.get_reading()
             mic_reading = self.mic.read_u16()
@@ -81,9 +87,13 @@ class PicoEnviroPlus:
                 "status": bme_data[4]
             }
             self.last_sensor_read = utime.ticks_ms()
+            if self.system_manager:
+                self.system_manager.stop_processing("reading_sensors")
             return self.sensor_data
         except Exception as e:
             self.log_manager.log(f"Error reading sensors: {e}")
+            if self.system_manager:
+                self.system_manager.add_error("sensor_read")
             return None
 
     def get_sensor_data(self):
