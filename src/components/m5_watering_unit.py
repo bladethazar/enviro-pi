@@ -5,10 +5,11 @@ import _thread
 import gc
 
 class M5WateringUnit:
-    def __init__(self, config, log_manager):
+    def __init__(self, config, log_manager, water_tank):
         self.log_manager = log_manager
         self.system_manager = None
         self.config = config
+        self.water_tank = water_tank
         
         # Initialize pins
         self.moisture_sensor = ADC(config.MOISTURE_SENSOR_PIN_NR)
@@ -22,7 +23,7 @@ class M5WateringUnit:
         self.WATERING_DURATION = config.WATERING_DURATION
         self.WATERING_MAX_CYCLES = config.WATERING_MAX_CYCLES
         self.WATERING_PAUSE_DURATION = config.WATERING_PAUSE_DURATION
-        self.WATER_TANK_CAPACITY = config.WATER_TANK_FULL_CAPACITY
+        # self.WATER_TANK_CAPACITY = config.WATER_TANK_FULL_CAPACITY
         
         # State variables
         self.current_moisture = self.read_moisture()
@@ -33,6 +34,7 @@ class M5WateringUnit:
         self.watering_pause_start_time = 0
         self.watering_cycle_pause_flag = False
         self.last_watering_check_time = 0
+        self.last_watered = 0
         
         self.lock = _thread.allocate_lock()
         
@@ -60,7 +62,9 @@ class M5WateringUnit:
             self.water_pump.off()
             self.watered_time += duration
             water_used = (duration / 60) * self.WATER_PUMP_FLOW_RATE
+            self.water_tank.reduce_capacity(water_used)
             self.water_used += water_used
+            self.last_watered = utime.time()
             self.log_manager.log(f"Watered for {duration}s, used {water_used:.2f}ml")
             if self.system_manager:
                 self.system_manager.stop_processing("watering")
@@ -72,21 +76,25 @@ class M5WateringUnit:
         finally:
             self.is_watering = False
 
-    def get_water_tank_capacity_left(self):
-        return max(0, self.WATER_TANK_CAPACITY - self.water_used)
+    # def get_water_tank_capacity_left(self):
+    #     return max(0, self.WATER_TANK_CAPACITY - self.water_used)
 
-    def reset_water_tank_capacity(self):
-        self.WATER_TANK_CAPACITY = self.config.WATER_TANK_FULL_CAPACITY
+    # def reset_water_tank_capacity(self):
+    #     self.WATER_TANK_CAPACITY = self.config.WATER_TANK_FULL_CAPACITY
+    #     self.water_used = 0
+    #     self.log_manager.log("Water tank capacity reset")
+    
+    def reset_water_used(self):
         self.water_used = 0
-        self.log_manager.log("Water tank capacity reset")
+        self.log_manager.log("Watering Unit 1 - water_used value reset")
 
     def get_current_data(self):
         with self.lock:
             return {
                 "moisture": round(self.current_moisture, 2) if self.current_moisture is not None else None,
                 "water_used": round(self.water_used, 2),
-                "water_left": round(self.get_water_tank_capacity_left(), 2),
-                "is_watering": self.is_watering,
+                "water_left": round(self.water_tank.get_capacity(), 2),
+                "last_watered": self.last_watered,
                 "watering_cycles": self.watering_cycles,
                 "watering_cycles_configured": self.WATERING_MAX_CYCLES
             }
@@ -106,7 +114,7 @@ class M5WateringUnit:
             if self.current_moisture < self.MOISTURE_THRESHOLD:
                 self.log_manager.log("Moisture below threshold")
                 if (self.watering_cycles < self.WATERING_MAX_CYCLES and 
-                    self.get_water_tank_capacity_left() > 0 and 
+                    self.water_tank.get_capacity() > 0 and 
                     not self.watering_cycle_pause_flag):
                     self.log_manager.log("Starting watering")
                     self.trigger_watering()
@@ -128,7 +136,7 @@ class M5WateringUnit:
             self.watering_cycles = 0
             self.watering_cycle_pause_flag = True
             self.watering_pause_start_time = utime.ticks_ms()
-        elif self.get_water_tank_capacity_left() <= 0:
+        elif self.water_tank.get_capacity() <= 0:
             self.log_manager.log("Water tank empty. Pausing automated watering. Refill water tank!")
 
     def update_status(self):
