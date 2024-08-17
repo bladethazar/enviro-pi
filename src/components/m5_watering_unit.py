@@ -10,6 +10,7 @@ class M5WateringUnit:
         self.system_manager = None
         self.config = config
         self.water_tank = water_tank
+        self.auto_watering = False
         
         # Initialize pins
         self.moisture_sensor = ADC(config.MOISTURE_SENSOR_PIN_NR)
@@ -23,7 +24,6 @@ class M5WateringUnit:
         self.WATERING_DURATION = config.WATERING_DURATION
         self.WATERING_MAX_CYCLES = config.WATERING_MAX_CYCLES
         self.WATERING_PAUSE_DURATION = config.WATERING_PAUSE_DURATION
-        # self.WATER_TANK_CAPACITY = config.WATER_TANK_FULL_CAPACITY
         
         # State variables
         self.current_moisture = self.read_moisture()
@@ -42,6 +42,12 @@ class M5WateringUnit:
 
     def set_system_manager(self, system_manager):
         self.system_manager = system_manager
+        
+    def toggle_auto_watering(self):
+        self.auto_watering = not self.auto_watering
+        status = "enabled" if self.auto_watering else "disabled"
+        self.log_manager.log(f"Auto watering {status}")
+        return self.auto_watering
 
     def read_moisture(self):
         try:
@@ -76,17 +82,24 @@ class M5WateringUnit:
         finally:
             self.is_watering = False
 
-    # def get_water_tank_capacity_left(self):
-    #     return max(0, self.WATER_TANK_CAPACITY - self.water_used)
-
-    # def reset_water_tank_capacity(self):
-    #     self.WATER_TANK_CAPACITY = self.config.WATER_TANK_FULL_CAPACITY
-    #     self.water_used = 0
-    #     self.log_manager.log("Water tank capacity reset")
     
     def reset_water_used(self):
         self.water_used = 0
         self.log_manager.log("Watering Unit 1 - water_used value reset")
+        
+    def get_time_since_last_watered(self):
+        if self.last_watered == 0:
+            return "Never"
+        
+        time_diff = utime.time() - self.last_watered
+        if time_diff < 60:
+            return f"{time_diff} sec ago"
+        elif time_diff < 3600:
+            return f"{time_diff // 60} min ago"
+        elif time_diff < 86400:
+            return f"{time_diff // 3600} hr ago"
+        else:
+            return f"{time_diff // 86400} days ago"
 
     def get_current_data(self):
         with self.lock:
@@ -94,9 +107,10 @@ class M5WateringUnit:
                 "moisture": round(self.current_moisture, 2) if self.current_moisture is not None else None,
                 "water_used": round(self.water_used, 2),
                 "water_left": round(self.water_tank.get_capacity(), 2),
-                "last_watered": self.last_watered,
+                "last_watered": self.get_time_since_last_watered(),
                 "watering_cycles": self.watering_cycles,
-                "watering_cycles_configured": self.WATERING_MAX_CYCLES
+                "watering_cycles_configured": self.WATERING_MAX_CYCLES,
+                "auto_watering": self.auto_watering
             }
 
     async def check_moisture_and_watering_status(self):
@@ -113,14 +127,17 @@ class M5WateringUnit:
 
             if self.current_moisture < self.MOISTURE_THRESHOLD:
                 self.log_manager.log("Moisture below threshold")
-                if (self.watering_cycles < self.WATERING_MAX_CYCLES and 
-                    self.water_tank.get_capacity() > 0 and 
-                    not self.watering_cycle_pause_flag):
-                    self.log_manager.log("Starting watering")
-                    self.trigger_watering()
+                if self.auto_watering:
+                    if (self.watering_cycles < self.WATERING_MAX_CYCLES and 
+                        self.water_tank.get_capacity() > 0 and 
+                        not self.watering_cycle_pause_flag):
+                        self.log_manager.log("Starting watering")
+                        self.trigger_watering()
+                    else:
+                        self.log_manager.log("Cannot start watering")
+                        await self.handle_watering_limits()
                 else:
-                    self.log_manager.log("Cannot start watering")
-                    await self.handle_watering_limits()
+                    self.log_manager.log("Automated watering deactivated")
             else:
                 self.log_manager.log("Soil moisture is okay.")
                 self.watering_cycles = 0
