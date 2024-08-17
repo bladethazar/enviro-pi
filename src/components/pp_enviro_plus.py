@@ -11,13 +11,16 @@ from adcfft import ADCFFT
 import gc
 
 class PicoEnviroPlus:
-    def __init__(self, config, log_manager, reset_water_tank_capacity, trigger_watering):
+    def __init__(self, config, log_manager, reset_water_tank_capacity, m5_watering_unit):
         self.config = config
         self.log_manager = log_manager
         self.system_manager = None
         self.display_manager = None
+        self.m5_watering_unit = m5_watering_unit
         self.reset_water_tank_capacity = reset_water_tank_capacity
-        self.trigger_watering = trigger_watering
+        self.trigger_watering = self.m5_watering_unit.trigger_watering
+        self.reset_water_used_unit_1 = self.m5_watering_unit.reset_water_used
+        self.toggle_auto_watering_unit_1 = self.m5_watering_unit.toggle_auto_watering
 
         # Initialize display
         self.display = PicoGraphics(display=DISPLAY_ENVIRO_PLUS, rotate=90)

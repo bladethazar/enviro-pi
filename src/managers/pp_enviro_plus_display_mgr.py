@@ -5,13 +5,14 @@ import utime
 
 
 class PicoEnviroPlusDisplayMgr:
-    def __init__(self, enviro_plus, log_mgr, data_mgr, m5_watering_unit, system_mgr):
+    def __init__(self, config, enviro_plus, log_mgr, data_mgr, m5_watering_unit, system_mgr):
         self.enviro_plus = enviro_plus
         self.log_mgr = log_mgr
         self.data_mgr = data_mgr
         self.m5_watering_unit = m5_watering_unit
         self.system_mgr = system_mgr
         self.display = enviro_plus.display
+        self.max_water_tank_capacity = config.WATER_TANK_FULL_CAPACITY
         
         # Initialize display constants
         self.DISPLAY_WIDTH, self.DISPLAY_HEIGHT = self.display.get_bounds()
@@ -45,7 +46,7 @@ class PicoEnviroPlusDisplayMgr:
                 "Y": (self.update_uv_index, "UV-Index")
             },
             "Watering": {
-                "A": (self.toggle_backlight, "Backlight"),
+                "A": (self.toggle_auto_watering, "Auto: On/Off"),
                 "B": (self.reset_water_tank, "Reset tank"),
                 "X": (self.cycle_display_mode, "Next"),
                 "Y": (self.trigger_watering, "Water Now")
@@ -101,21 +102,15 @@ class PicoEnviroPlusDisplayMgr:
 
     def reset_water_tank(self):
         self.enviro_plus.reset_water_tank_capacity()
-        self.log_mgr.log("Water tank capacity reset")
+        self.enviro_plus.reset_water_used_unit_1()
+    
+    def toggle_auto_watering(self):
+        new_status = self.m5_watering_unit.toggle_auto_watering()
+        self.log_mgr.log(f"Auto watering {'enabled' if new_status else 'disabled'}")
 
     async def trigger_watering(self):
         self.log_mgr.log("Manual watering triggered")
         await self.m5_watering_unit.trigger_watering()
-
-    # async def handle_button_press(self, button):
-    #     if self.enviro_plus.display_mode in self.button_config and button in self.button_config[self.enviro_plus.display_mode]:
-    #         action, _ = self.button_config[self.enviro_plus.display_mode][button]
-    #         if action == self.trigger_watering:
-    #             await self.trigger_watering()
-    #         elif action == self.cycle_display_mode:
-    #             self.cycle_display_mode()
-    #         else:
-    #             action()
 
     def draw_button_labels(self):
         self.display.set_pen(self.WHITE)
@@ -210,36 +205,57 @@ class PicoEnviroPlusDisplayMgr:
         self.display.update()
 
     async def update_watering_display(self, watering_unit_data):
-        # Clear the display
         self.draw_display_mode_title("H²O")
         
-        # Display watering data
-        y_offset = 35
-        self.display.text(f"Moisture: {watering_unit_data['moisture']:.1f}%", 5, y_offset, scale=2)
-        y_offset += 30
-        
         # Water tank capacity bar graph
-        max_capacity = 1400
         bar_width = 20
-        bar_height = 100
-        fill_height = int((watering_unit_data['water_left'] / max_capacity) * bar_height)
+        bar_height = 180
+        fill_height = int((watering_unit_data['water_left'] / self.max_water_tank_capacity) * bar_height)
         bar_x = 5
-        bar_y = y_offset
+        bar_y = 35
+        
+        # Update moisture history
+        self.update_moisture_history(watering_unit_data['moisture'])
+        min_moisture, max_moisture, _ = self.get_moisture_stats()
         
         self.display.set_pen(self.WHITE)
         self.display.rectangle(bar_x, bar_y, bar_width, bar_height)
         self.display.set_pen(self.BLUE)
         self.display.rectangle(bar_x, bar_y + (bar_height - fill_height), bar_width, fill_height)
         
+        # Display watering data
+        x_offset = bar_x + bar_width + 10
+        y_offset = bar_y
         self.display.set_pen(self.WHITE)
-        self.display.text(f"Water left: {watering_unit_data['water_left']:.0f}ml", bar_x + 30, bar_y, scale=2)
-        percentage = (watering_unit_data['water_left'] / max_capacity) * 100
-        self.display.text(f"({percentage:.0f}%)", bar_x + 30, bar_y + 25, scale=2)
         
-        y_offset += bar_height + 10
-        self.display.text(f"Is watering: {'Yes' if watering_unit_data['is_watering'] else 'No'}", 5, y_offset, scale=2)
-        y_offset += 30
-        self.display.text(f"Cycles: {watering_unit_data['watering_cycles']}/{watering_unit_data['watering_cycles_configured']}", 5, y_offset, scale=2)
+        self.display.text(f"Moisture: {watering_unit_data['moisture']:.1f}%", x_offset, y_offset, scale=2)
+        y_offset += 20
+        
+        # Display min and max moisture
+        self.display.text(f"Min: {min_moisture:.1f}% | Max: {max_moisture:.1f}%", x_offset, y_offset, scale=1.5)
+        y_offset += 25
+        
+        self.display.line(25, y_offset - 10, self.DISPLAY_WIDTH, y_offset - 10, 1)
+        
+        self.display.set_pen(self.CYAN)
+        auto_status = "ON" if watering_unit_data['auto_watering'] else "OFF"
+        self.display.text(f"Auto watering: {auto_status}", x_offset, y_offset, scale=2)
+        y_offset += 25
+        
+        self.display.text(f"Last watered:", x_offset, y_offset, scale=2)
+        y_offset += 20
+        
+        self.display.text(f"-> {watering_unit_data['last_watered']}", x_offset, y_offset, scale=2)
+        y_offset += 25
+        
+        self.display.text(f"Water left:", x_offset, y_offset, scale=2)
+        y_offset += 20
+        
+        percentage = (watering_unit_data['water_left'] / self.max_water_tank_capacity) * 100
+        self.display.text(f"-> {watering_unit_data['water_left']:.0f}ml ({percentage:.0f}%)", x_offset, y_offset, scale=2)
+        y_offset += 25
+        
+        self.display.text(f"Cycles: {watering_unit_data['watering_cycles']}/{watering_unit_data['watering_cycles_configured']}", x_offset, y_offset, scale=2)
         
         self.draw_button_labels()
         self.display.update()

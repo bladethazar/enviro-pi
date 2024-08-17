@@ -15,6 +15,7 @@ from managers.log_manager import LogManager
 from managers.pp_enviro_plus_display_mgr import PicoEnviroPlusDisplayMgr
 from components.m5_watering_unit import M5WateringUnit
 from components.pp_enviro_plus import PicoEnviroPlus
+from components.water_tank import WaterTank
 
 # Enable emergency exception buffer
 micropython.alloc_emergency_exception_buf(100)
@@ -30,8 +31,9 @@ wifi_mgr = WiFiManager(PicoWConfig, log_mgr)
 mqtt_mgr = MQTTManager(PicoWConfig, log_mgr)
 
 # Initialize components
-m5_watering_unit = M5WateringUnit(PicoWConfig, log_mgr)
-enviro_plus = PicoEnviroPlus(PicoWConfig, log_mgr, m5_watering_unit.reset_water_tank_capacity, m5_watering_unit.trigger_watering)
+water_tank = WaterTank(PicoWConfig.WATER_TANK_FULL_CAPACITY, log_mgr)
+m5_watering_unit = M5WateringUnit(PicoWConfig, log_mgr, water_tank)
+enviro_plus = PicoEnviroPlus(PicoWConfig, log_mgr, water_tank.reset_capacity, m5_watering_unit)
 enviro_plus.init_sensors()
 enviro_plus_led = enviro_plus.get_led()
 
@@ -39,7 +41,7 @@ enviro_plus_led = enviro_plus.get_led()
 system_mgr.set_led(enviro_plus_led)
 
 # Init enviro+ display manager
-enviro_plus_display_mgr = PicoEnviroPlusDisplayMgr(enviro_plus, log_mgr, data_mgr, m5_watering_unit, system_mgr)
+enviro_plus_display_mgr = PicoEnviroPlusDisplayMgr(PicoWConfig, enviro_plus, log_mgr, data_mgr, m5_watering_unit, system_mgr)
 enviro_plus_display_mgr.setup_display(PicoWConfig)
 
 # Set display manager in enviro_plus
