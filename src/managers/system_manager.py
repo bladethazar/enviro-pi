@@ -1,8 +1,10 @@
 import machine
 from machine import ADC, Pin, freq
 import utime
+import uasyncio
 import gc
 import micropython
+from managers.led_manager import LEDManager
 
 class SystemManager:
     def __init__(self, config):
@@ -18,6 +20,50 @@ class SystemManager:
         self.uptime = 0
         self.mem_alloc_threshold = 0.9  # 90% memory allocation threshold
         self.cpu_usage_threshold = 0.8  # 80% CPU usage threshold
+        self.status = "RUNNING"
+        self.led_manager = None
+        self.processing_tasks = set()
+        self.errors = set()
+
+    def set_led(self, led):
+        self.led_manager = LEDManager(led)
+
+    async def run(self):
+        while True:
+            self.update_status()
+            await uasyncio.sleep_ms(100)
+
+    def update_status(self):
+        if self.errors:
+            new_status = "ERROR"
+        elif self.processing_tasks:
+            new_status = "PROCESSING"
+        else:
+            new_status = "RUNNING"
+        
+        if new_status != self.status:
+            self.status = new_status
+            if self.led_manager:
+                self.led_manager.update_led(self.status)
+
+    def start_processing(self, task_name):
+        self.processing_tasks.add(task_name)
+        self.update_status()
+
+    def stop_processing(self, task_name):
+        self.processing_tasks.discard(task_name)
+        self.update_status()
+
+    def add_error(self, error_name):
+        self.errors.add(error_name)
+        self.update_status()
+
+    def clear_error(self, error_name):
+        self.errors.discard(error_name)
+        self.update_status()
+
+    def get_status(self):
+        return self.status
         
     def update_uptime(self):
         current_time = utime.ticks_ms()
