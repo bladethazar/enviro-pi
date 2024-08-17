@@ -1,0 +1,66 @@
+{
+    "ADC_PINS_TO_MONITOR": [26, 27, 28, 29],
+    "LOG_MANAGER_BUFFER_SIZE": 15,
+    
+    "WIFI_SSID": "<YOUR_WIFI_SSID>",
+    "WIFI_PASSWORD": "<YOUR_WIFI_PASSWORD>",
+    "WIFI_COUNTRY": "<YOUR_COUNTRY_CODE>",
+    
+    "MQTT_CLIENT_NAME": "<YOUR_MQTT_CLIENT_NAME>",
+    "MQTT_BROKER_ADDRESS": "<YOUR_MQTT_BROKER_IP>",
+    "MQTT_BROKER_PORT": 1883,
+    "MQTT_UPDATE_INTERVAL": 60,
+    "MQTT_TOPICS": {
+        "m5-watering-unit": [
+            "moisture",
+            "water_used",
+            "water_left",
+            "is_watering",
+            "watering_cycles",
+            "watering_cycles_configured"
+        ],
+        "enviro-plus": [
+            "temperature",
+            "humidity",
+            "pressure",
+            "gas",
+            "lux",
+            "mic"
+        ],
+        "system": [
+            "internal_voltage",
+            "chip_temperature",
+            "cpu_frequency",
+            "cpu_usage",
+            "ram_usage",
+            "timestamp",
+            "uptime"
+        ],
+        "adc": [
+            "adc_26",
+            "adc_27",
+            "adc_28",
+            "adc_29"
+        ]
+    },
+
+    "WATER_PUMP_PIN_NR": 22,
+    "MOISTURE_SENSOR_PIN_NR": 27,
+    "MOISTURE_SENSOR_DRY_VALUE": 30000,
+    "MOISTURE_SENSOR_WET_VALUE": 17000,
+    "MOISTURE_THRESHOLD": 40,
+    "MOISTURE_CHECK_INTERVAL": 300,
+    
+    "WATERING_CHECK_INTERVAL": 900,
+    "WATERING_DURATION": 5,
+    "WATERING_PAUSE_DURATION": 3600,
+    "WATERING_MAX_CYCLES": 1,
+    "WATER_TANK_FULL_CAPACITY": 1400,
+    "WATER_PUMP_FLOW_RATE": 600,
+    
+    "MICROPHONE_PIN": 26,
+    "TEMPERATURE_OFFSET": 5,
+    "ENVIRO_PLUS_DISPLAY_BRIGHTNESS": 0.8,
+    "ALTITUDE": 0,
+    "GAS_ALERT_TRESHOLD": 0.5
+}

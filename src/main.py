@@ -19,6 +19,9 @@ from components.pp_enviro_plus import PicoEnviroPlus
 # Enable emergency exception buffer
 micropython.alloc_emergency_exception_buf(100)
 
+# Load custom configuration from json-file
+PicoWConfig.load_from_file()
+
 # Managers
 log_mgr = LogManager(PicoWConfig)
 system_mgr = SystemManager(PicoWConfig)
