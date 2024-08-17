@@ -32,6 +32,9 @@ enviro_plus = PicoEnviroPlus(PicoWConfig, log_mgr, m5_watering_unit.reset_water_
 enviro_plus.init_sensors()
 enviro_plus_led = enviro_plus.get_led()
 
+# Set up SystemManager with LED
+system_mgr.set_led(enviro_plus_led)
+
 # Init enviro+ display manager
 enviro_plus_display_mgr = PicoEnviroPlusDisplayMgr(enviro_plus, log_mgr, data_mgr, m5_watering_unit, system_mgr)
 enviro_plus_display_mgr.setup_display(PicoWConfig)
@@ -39,7 +42,15 @@ enviro_plus_display_mgr.setup_display(PicoWConfig)
 # Set display manager in enviro_plus
 enviro_plus.set_display_manager(enviro_plus_display_mgr)
 
+
+# Set SystemManager to controll system status led
+wifi_mgr.set_system_manager(system_mgr)
+mqtt_mgr.set_system_manager(system_mgr)
+m5_watering_unit.set_system_manager(system_mgr)
+enviro_plus.set_system_manager(system_mgr)
+
 # Global variables
+current_status = "running"
 last_mqtt_publish = 0
 last_moisture_check = 0
 
@@ -116,7 +127,7 @@ async def update_display(sensor_data):
     except Exception as e:
         log_mgr.log(f"Error updating display: {e}")
 
-async def handle_mqtt_publishing(sensor_data): 
+async def handle_mqtt_publishing(sensor_data):
     global last_mqtt_publish
     current_time = utime.time()
     
@@ -143,17 +154,11 @@ async def handle_mqtt_publishing(sensor_data):
                 publish_result = await mqtt_mgr.publish_data(prepared_mqtt_data)
                 if publish_result:
                     last_mqtt_publish = current_time
-                    enviro_plus_led.set_rgb(0, 50, 0)
-                    uasyncio.sleep(0.5)
-                    enviro_plus_led.set_rgb(0, 0, 0)
-                    
-                else:
-                    enviro_plus_led.set_rgb(255, 0, 0)
             except Exception as e:
                 log_mgr.log(f"MQTT publishing error: {e}")
-                enviro_plus_led.set_rgb(255, 0, 0)
         else:
             log_mgr.log("MQTT connection failed, skipping publish")
+
 
 async def startup_sequence():
     display_task = None
@@ -202,6 +207,7 @@ async def main_loop():
     log_mgr.log("Starting main loop...")
     await startup_sequence()
     uasyncio.create_task(enviro_plus.run())
+    uasyncio.create_task(system_mgr.run())  # Start the SystemManager task
     while True:
         try:
             gc.collect()
@@ -235,7 +241,8 @@ async def main_loop():
             await uasyncio.sleep(5)
 
 async def main():
-    await main_loop()
+    main_loop_task = uasyncio.create_task(main_loop())
+    await main_loop_task
 
 # Run the main coroutine
 uasyncio.run(main())
