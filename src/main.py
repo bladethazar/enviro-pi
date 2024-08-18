@@ -25,8 +25,8 @@ PicoWConfig.load_from_file()
 
 # Managers
 log_mgr = LogManager(PicoWConfig)
-system_mgr = SystemManager(PicoWConfig)
 data_mgr = DataManager(PicoWConfig)
+system_mgr = SystemManager(PicoWConfig, log_mgr, data_mgr)
 wifi_mgr = WiFiManager(PicoWConfig, log_mgr)
 mqtt_mgr = MQTTManager(PicoWConfig, log_mgr)
 
