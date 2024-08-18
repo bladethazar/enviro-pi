@@ -35,6 +35,7 @@ class M5WateringUnit:
         self.watering_cycle_pause_flag = False
         self.last_watering_check_time = 0
         self.last_watered = 0
+        self.watering_block_timer = 0 
         
         self.lock = _thread.allocate_lock()
         
@@ -60,9 +61,15 @@ class M5WateringUnit:
             return None
 
     async def control_pump(self, duration):
+        current_time = utime.time()
+        if current_time < self.watering_block_timer:
+            self.log_manager.log(f"Watering blocked. Please wait {self.watering_block_timer - current_time} seconds.")
+            return
+
         try:
             if self.system_manager:
                 self.system_manager.start_processing("watering")
+            self.is_watering = True
             self.water_pump.on()
             await uasyncio.sleep(duration)
             self.water_pump.off()
@@ -71,6 +78,7 @@ class M5WateringUnit:
             self.water_tank.reduce_capacity(water_used)
             self.water_used += water_used
             self.last_watered = utime.time()
+            self.watering_block_timer = self.last_watered + duration  # Set the block timer
             self.log_manager.log(f"Watered for {duration}s, used {water_used:.2f}ml")
             if self.system_manager:
                 self.system_manager.stop_processing("watering")
@@ -144,8 +152,11 @@ class M5WateringUnit:
             self.log_manager.log("Moisture and watering status check completed")
 
     async def trigger_watering(self):
-        self.log_manager.log(f"Manual watering triggered for {self.WATERING_DURATION} seconds.")
-        await self.control_pump(self.WATERING_DURATION)
+        if not self.is_watering:
+            self.log_manager.log(f"Manual watering triggered for {self.WATERING_DURATION} seconds.")
+            await self.control_pump(self.WATERING_DURATION)
+        else:
+            self.log_manager.log("Watering already in progress. Please wait.")
 
     async def handle_watering_limits(self):
         if self.watering_cycles >= self.WATERING_MAX_CYCLES:
