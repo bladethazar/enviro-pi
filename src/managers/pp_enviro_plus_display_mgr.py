@@ -19,7 +19,7 @@ class PicoEnviroPlusDisplayMgr:
         self.setup_colors()
         
         self.display_backlight_on = True
-        self.display_modes = ["Sensor", "Watering", "Log", "System"]
+        self.display_modes = ["Watering", "Sensor", "System", "Log"]
         self.current_mode_index = 1  # Start with Watering mode
         self.enviro_plus.display_mode = self.display_modes[self.current_mode_index]
         
@@ -89,7 +89,8 @@ class PicoEnviroPlusDisplayMgr:
     def clear_display(self):
         self.display.set_pen(self.BLACK)
         self.display.clear()
-        
+
+    # Button functions
     def toggle_backlight(self):
         self.display_backlight_on = not self.display_backlight_on
         self.display.set_backlight(0.8 if self.display_backlight_on else 0)
@@ -111,6 +112,33 @@ class PicoEnviroPlusDisplayMgr:
     async def trigger_watering(self):
         self.log_mgr.log("Manual watering triggered")
         await self.m5_watering_unit.trigger_watering()
+
+    def read_all_sensors(self):
+        self.log_mgr.log("Reading all sensors")
+        # Implement sensor reading logic
+
+    def update_uv_index(self):
+        self.log_mgr.log("Updating UV Index")
+        # Implement UV Index update logic
+
+    def clear_system_memory(self):
+        self.log_mgr.log("Clearing system memory")
+        self.cleanup_display()
+        self.display.set_pen(self.YELLOW)
+        self.display.text("Clearing memory...", 5, self.DISPLAY_HEIGHT // 2, scale=2)
+        self.display.update()
+        self.system_mgr.clear_memory()
+        utime.sleep(2)  # Allow time for the message to be displayed
+        self.update_system_display(self.system_mgr.get_system_data()[0]['system']) 
+
+    def initiate_system_restart(self):
+        self.log_mgr.log("System restart initiated")
+        self.clear_display()
+        self.display.set_pen(self.RED)
+        self.display.text("Restarting system...", 5, self.DISPLAY_HEIGHT // 2, scale=2)
+        self.display.update()
+        utime.sleep(2)  # Allow time for the message to be displayed
+        self.system_mgr.restart_system()  # Call the system manager's restart method
 
     def draw_button_labels(self):
         self.display.set_pen(self.WHITE)
@@ -146,72 +174,80 @@ class PicoEnviroPlusDisplayMgr:
         title_x = (self.DISPLAY_WIDTH - title_width) // 2
         self.display.set_pen(self.WHITE)
         self.display.text(title, title_x, 5, scale=title_scale)
-
-    def read_all_sensors(self):
-        self.log_mgr.log("Reading all sensors")
-        # Implement sensor reading logic
-
-    def update_uv_index(self):
-        self.log_mgr.log("Updating UV Index")
-        # Implement UV Index update logic
-
-    def clear_system_memory(self):
-        self.log_mgr.log("Clearing system memory")
-        self.clear_display()
-        self.display.set_pen(self.YELLOW)
-        self.display.text("Clearing memory...", 5, self.DISPLAY_HEIGHT // 2, scale=2)
-        self.display.update()
-        self.system_mgr.clear_memory()
-        utime.sleep(2)  # Allow time for the message to be displayed
-        self.update_system_display(self.system_mgr.get_system_data()[0]['system']) 
-
-    def initiate_system_restart(self):
-        self.log_mgr.log("System restart initiated")
-        self.clear_display()
-        self.display.set_pen(self.RED)
-        self.display.text("Restarting system...", 5, self.DISPLAY_HEIGHT // 2, scale=2)
-        self.display.update()
-        utime.sleep(2)  # Allow time for the message to be displayed
-        self.system_mgr.restart_system()  # Call the system manager's restart method
-
         
-    async def update_sensor_display(self, temperature, humidity, pressure, lux, gas, mic):
+    async def update_sensor_display(self, sensor_data):
         self.draw_display_mode_title("Sensors")
         
-        # Display sensor data
-        y_offset = 35
+        y_offset = 30
+        left_column = 5
+        right_column = 125
+        
+        # Environment status indicator
+        status_color = self.GREEN if sensor_data['env_status'] == "Optimal" else self.YELLOW
+        self.display.set_pen(status_color)
+        self.display.circle(left_column + 5, y_offset + 10, 10)
+        self.display.text(sensor_data['env_status'], left_column + 25, y_offset + 3, scale=2)
+        # Display issues if any
+        if sensor_data['env_issues']:
+            y_offset += 20
+            self.display.set_pen(self.YELLOW)
+            self.display.text(f"Issues: {sensor_data['env_issues']}", left_column + 25, y_offset, scale=1.5)
+
+        # Draw line at a consistent position
+        y_offset = 55  # Set a fixed y_offset for the line
+        self.display.set_pen(self.WHITE)
+        self.display.line(0, y_offset, self.DISPLAY_WIDTH, y_offset, 1)
         
         # Temperature display with min and max
-        self.display.set_pen(self.GREY)
-        self.display.rectangle(0, y_offset, self.DISPLAY_WIDTH, 60)
-        
-        if temperature > 28:
-            self.display.set_pen(self.RED)
-        elif temperature < 10:
-            self.display.set_pen(self.CYAN)
+        y_offset += 1
+        if sensor_data['temperature'] > 28:
+            temp_color = self.RED
+        elif sensor_data['temperature'] < 10:
+            temp_color = self.CYAN
         else:
-            self.display.set_pen(self.GREEN)
-        
-        self.display.text(f"{temperature:.1f}C", 5, y_offset + 5, scale=3)
-        
-        self.display.set_pen(self.CYAN)
-        self.display.text(f"min {self.enviro_plus.min_temperature:.1f}", 155, y_offset + 5, scale=2)
-        self.display.set_pen(self.RED)
-        self.display.text(f"max {self.enviro_plus.max_temperature:.1f}", 155, y_offset + 30, scale=2)
-        
-        y_offset += 70
-        
+            temp_color = self.GREEN
+            
         self.display.set_pen(self.WHITE)
-        self.display.text(f"Humidity: {humidity:.0f}%", 5, y_offset, scale=2)
-        y_offset += 25
-        self.display.text(f"Pressure: {pressure:.0f}hPa", 5, y_offset, scale=2)
-        y_offset += 25
-        self.display.text(f"Light: {lux:.0f} lux", 5, y_offset, scale=2)
-        y_offset += 25
-        self.display.text(f"Gas: {gas:.0f}", 5, y_offset, scale=2)
-        y_offset += 25
-        self.display.text(f"Mic: {mic}", 5, y_offset, scale=2)
+
         
+        self.display.set_pen(self.GREY)
+        self.display.rectangle(0, y_offset, self.DISPLAY_WIDTH, 30)
+        self.display.set_pen(temp_color)
+        self.display.text(f"{sensor_data['temperature']:.1f}°C", left_column, y_offset + 5, scale=3)
+        self.display.set_pen(self.CYAN)
+        self.display.text(f"Min: {self.enviro_plus.min_temperature:.1f}°C", right_column, y_offset, scale=2)
+        self.display.set_pen(self.RED)
+        self.display.text(f"Max: {self.enviro_plus.max_temperature:.1f}°C", right_column, y_offset + 15, scale=2)
+        
+
+        # Other sensor data
+        y_offset += 35
+        self.display.set_pen(self.WHITE)
+        self.display.text(f"Humidity: {sensor_data['humidity']:.1f}%", left_column, y_offset, scale=2)
+        
+        y_offset += 20
+        self.display.text(f"Pressure: {sensor_data['pressure']:.0f} hPa", left_column, y_offset, scale=2)
+        
+        y_offset += 20
+        light_status = sensor_data.get('light_status', 'N/A')
+        self.display.text(f"Light: {sensor_data['lux']:.0f} lux", left_column, y_offset, scale=2)
+        self.display.text(f"({light_status})", right_column, y_offset, scale=2)
+        
+        y_offset += 20
+        self.display.text(f"Air Quality: {sensor_data['gas_quality']}", left_column, y_offset, scale=2)
+        
+        y_offset += 20
+        if 'mic' in sensor_data:
+            mic_value = sensor_data['mic']
+            if isinstance(mic_value, (int, float)):
+                self.display.text(f"Sound: {mic_value:.1f} dB", left_column, y_offset, scale=2)
+            else:
+                self.display.text("Sound: N/A", left_column, y_offset, scale=2)
+        else:
+            self.display.text("Sound: N/A", left_column, y_offset, scale=2)
+
+
+
         self.draw_button_labels()
         self.display.update()
 
@@ -338,7 +374,6 @@ class PicoEnviroPlusDisplayMgr:
             return 0, 0, 0
         return min(self.moisture_history), max(self.moisture_history), sum(self.moisture_history) / len(self.moisture_history)
 
-    def cleanup(self):
+    def cleanup_display(self):
         self.clear_display()
-        self.display.set_backlight(0)
         gc.collect()

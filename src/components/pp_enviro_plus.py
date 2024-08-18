@@ -11,9 +11,10 @@ from adcfft import ADCFFT
 import gc
 
 class PicoEnviroPlus:
-    def __init__(self, config, log_manager, reset_water_tank_capacity, m5_watering_unit):
+    def __init__(self, config, log_manager, data_mgr, reset_water_tank_capacity, m5_watering_unit):
         self.config = config
         self.log_manager = log_manager
+        self.data_mgr = data_mgr
         self.system_manager = None
         self.display_manager = None
         self.m5_watering_unit = m5_watering_unit
@@ -78,14 +79,35 @@ class PicoEnviroPlus:
             ltr_data = self.ltr.get_reading()
             mic_reading = self.mic.read_u16()
 
+            temperature = bme_data[0]
+            pressure = bme_data[1]
+            humidity = bme_data[2]
+            gas = bme_data[3]
+            lux = ltr_data[BreakoutLTR559.LUX] if ltr_data else 0
+
+            corrected_temperature = self.data_mgr.correct_temperature_reading(temperature)
+            self.set_temperature_edge_values(corrected_temperature)
+            corrected_humidity = self.data_mgr.correct_humidity_reading(humidity, temperature, corrected_temperature)
+            adjusted_pressure = self.data_mgr.adjust_to_sea_pressure(pressure, corrected_temperature, self.config.ALTITUDE)
+            adjusted_lux = self.data_mgr.adjust_lux_for_growhouse(lux)
+            gas_quality = self.data_mgr.interpret_gas_reading(gas)
+            mic_db = self.data_mgr.interpret_mic_reading(mic_reading)
+
+            env_status, issues, light_status = self.data_mgr.describe_growhouse_environment(
+                corrected_temperature, corrected_humidity, adjusted_lux)
+
             self.sensor_data = {
-                "temperature": bme_data[0] - self.config.TEMPERATURE_OFFSET,
-                "pressure": bme_data[1],
-                "humidity": bme_data[2],
-                "gas": bme_data[3],
-                "lux": ltr_data[BreakoutLTR559.LUX] if ltr_data else None,
-                "mic": mic_reading,
-                "status": bme_data[4]
+                "temperature": corrected_temperature,
+                "humidity": corrected_humidity,
+                "pressure": adjusted_pressure,
+                "gas": gas,
+                "gas_quality": gas_quality,
+                "lux": adjusted_lux,
+                "light_status": light_status,
+                "mic": mic_db,
+                "status": bme_data[4],
+                "env_status": env_status,
+                "env_issues": issues
             }
             self.last_sensor_read = utime.ticks_ms()
             return self.sensor_data
