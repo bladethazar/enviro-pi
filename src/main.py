@@ -33,7 +33,7 @@ mqtt_mgr = MQTTManager(PicoWConfig, log_mgr)
 # Initialize components
 water_tank = WaterTank(PicoWConfig.WATER_TANK_FULL_CAPACITY, log_mgr)
 m5_watering_unit = M5WateringUnit(PicoWConfig, log_mgr, water_tank)
-enviro_plus = PicoEnviroPlus(PicoWConfig, log_mgr, water_tank.reset_capacity, m5_watering_unit)
+enviro_plus = PicoEnviroPlus(PicoWConfig, log_mgr, data_mgr, water_tank.reset_capacity, m5_watering_unit)
 enviro_plus.init_sensors()
 enviro_plus_led = enviro_plus.get_led()
 
@@ -68,30 +68,33 @@ async def read_sensors():
         return None
     
     try:
+        # Extract and process the new sensor data
         temperature = sensor_data.get('temperature')
         pressure = sensor_data.get('pressure')
         humidity = sensor_data.get('humidity')
         gas = sensor_data.get('gas')
+        gas_quality = sensor_data.get('gas_quality')
         lux = sensor_data.get('lux')
+        light_status = sensor_data["light_status"]
+        mic = sensor_data.get('mic')
+        env_status = sensor_data.get('env_status')
+        env_issues = sensor_data.get('env_issues', [])
         
-        if None in (temperature, pressure, humidity, gas, lux):
+        if None in (temperature, pressure, humidity, gas, lux, mic):
             return None
         
-        corrected_temperature = data_mgr.correct_temperature_reading(temperature)
-        corrected_humidity = data_mgr.correct_humidity_reading(humidity, temperature, corrected_temperature)
-        pressure_hpa = data_mgr.adjust_to_sea_pressure(pressure, corrected_temperature, PicoWConfig.ALTITUDE)
-        
-        enviro_plus.set_temperature_edge_values(corrected_temperature)
-        enviro_plus.set_gas_edge_values(gas)
-        
         return {
-            "temperature": corrected_temperature,
-            "humidity": corrected_humidity,
-            "pressure": pressure_hpa,
+            "temperature": temperature,
+            "humidity": humidity,
+            "pressure": pressure,
             "gas": gas,
+            "gas_quality": gas_quality,
             "lux": lux,
-            "mic": sensor_data.get('mic'),
-            "status": sensor_data.get('status', 0)
+            "light_status": light_status,
+            "mic": mic,
+            "status": sensor_data.get('status', 0),
+            "env_status": env_status,
+            "env_issues": ','.join(env_issues) if env_issues else ''
         }
     except Exception as e:
         log_mgr.log(f"Error processing sensor data: {e}")
@@ -111,15 +114,7 @@ async def update_display(sensor_data):
     
     try:
         if enviro_plus.display_mode == "Sensor":
-            if all(key in sensor_data for key in ['temperature', 'humidity', 'pressure', 'lux', 'gas']):
-                await enviro_plus_display_mgr.update_sensor_display(
-                    sensor_data['temperature'],
-                    sensor_data['humidity'],
-                    sensor_data['pressure'],
-                    sensor_data['lux'],
-                    sensor_data['gas'],
-                    sensor_data['mic']
-                )
+            await enviro_plus_display_mgr.update_sensor_display(sensor_data)
         elif enviro_plus.display_mode == "Watering":
             watering_unit_data = m5_watering_unit.get_current_data()
             if watering_unit_data:
@@ -148,8 +143,12 @@ async def handle_mqtt_publishing(sensor_data):
                     "humidity": sensor_data['humidity'],
                     "pressure": sensor_data['pressure'],
                     "gas": sensor_data['gas'],
+                    "gas_quality": sensor_data['gas_quality'],
                     "lux": sensor_data['lux'],
-                    "mic": sensor_data['mic']
+                    "light_status": sensor_data['light_status'],
+                    "mic": sensor_data['mic'],
+                    "env_status": sensor_data['env_status'],
+                    "env_issues": sensor_data['env_issues']
                 }
                 prepared_mqtt_data = data_mgr.prepare_mqtt_sensor_data_for_publishing(
                     m5_watering_unit.get_current_data(),
@@ -235,7 +234,7 @@ async def main_loop():
             if sensor_data.get('status', 0) & STATUS_HEATER_STABLE:
                 await handle_mqtt_publishing(sensor_data)
             else:
-                log_mgr.log("Sensor heater not stable, skipping MQTT publishing")
+                log_mgr.log(" Gas sensor heater not stable, skipping MQTT publishing")
 
             wdt.feed()
             await uasyncio.sleep(1)
