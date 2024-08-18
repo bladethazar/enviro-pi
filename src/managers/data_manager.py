@@ -15,6 +15,9 @@ class DataManager:
         pressure_hpa = pressure / 100
         adjusted_hpa = pressure_hpa + ((pressure_hpa * 9.80665 * altitude) / (287 * (273 + temperature + (altitude / 400))))
         return adjusted_hpa
+    
+    def adjust_cpu_frequency(self, cpu_frequency):
+        return cpu_frequency / 1000000
 
     def prepare_mqtt_sensor_data_for_publishing(self, m5_watering_unit_data, enviro_plus_data, system_data):
         try:
