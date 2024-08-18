@@ -24,8 +24,6 @@ class MQTTManager:
             return False
 
         try:
-            if self.system_manager:
-                self.system_manager.start_processing("mqtt_publish")
             for topic, subtopics in self.config.MQTT_TOPICS.items():
                 if topic in data:
                     for subtopic in subtopics:
@@ -44,8 +42,6 @@ class MQTTManager:
                     self.log_mgr.log(f"Topic {topic} not found in data")
             
             self.last_publish_time = utime.time()
-            if self.system_manager:
-                self.system_manager.stop_processing("mqtt_publish")
             self.log_mgr.log("MQTT data published successful")
             return True
         except Exception as e:

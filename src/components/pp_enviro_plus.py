@@ -74,8 +74,6 @@ class PicoEnviroPlus:
 
     def read_sensors(self):
         try:
-            if self.system_manager:
-                self.system_manager.start_processing("reading_sensors")
             bme_data = self.bme.read()
             ltr_data = self.ltr.get_reading()
             mic_reading = self.mic.read_u16()
@@ -90,8 +88,6 @@ class PicoEnviroPlus:
                 "status": bme_data[4]
             }
             self.last_sensor_read = utime.ticks_ms()
-            if self.system_manager:
-                self.system_manager.stop_processing("reading_sensors")
             return self.sensor_data
         except Exception as e:
             self.log_manager.log(f"Error reading sensors: {e}")

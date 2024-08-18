@@ -59,9 +59,9 @@ class PicoEnviroPlusDisplayMgr:
             },
             "System": {
                 "A": (self.toggle_backlight, "Backlight"),
-                "B": (self.reset_wifi, "Reset WiFi"),
+                "B": (self.clear_system_memory, "Clear Memory"),
                 "X": (self.cycle_display_mode, "Next"),
-                "Y": (self.reset_mqtt, "Reset MQTT")
+                "Y": (self.initiate_system_restart, "Restart")
             }
         }
 
@@ -147,7 +147,6 @@ class PicoEnviroPlusDisplayMgr:
         self.display.set_pen(self.WHITE)
         self.display.text(title, title_x, 5, scale=title_scale)
 
-    # Placeholder methods for new button actions
     def read_all_sensors(self):
         self.log_mgr.log("Reading all sensors")
         # Implement sensor reading logic
@@ -156,13 +155,25 @@ class PicoEnviroPlusDisplayMgr:
         self.log_mgr.log("Updating UV Index")
         # Implement UV Index update logic
 
-    def reset_wifi(self):
-        self.log_mgr.log("Resetting WiFi")
-        # Implement WiFi reset logic
+    def clear_system_memory(self):
+        self.log_mgr.log("Clearing system memory")
+        self.clear_display()
+        self.display.set_pen(self.YELLOW)
+        self.display.text("Clearing memory...", 5, self.DISPLAY_HEIGHT // 2, scale=2)
+        self.display.update()
+        self.system_mgr.clear_memory()
+        utime.sleep(2)  # Allow time for the message to be displayed
+        self.update_system_display(self.system_mgr.get_system_data()[0]['system']) 
 
-    def reset_mqtt(self):
-        self.log_mgr.log("Resetting MQTT")
-        # Implement MQTT reset logic
+    def initiate_system_restart(self):
+        self.log_mgr.log("System restart initiated")
+        self.clear_display()
+        self.display.set_pen(self.RED)
+        self.display.text("Restarting system...", 5, self.DISPLAY_HEIGHT // 2, scale=2)
+        self.display.update()
+        utime.sleep(2)  # Allow time for the message to be displayed
+        self.system_mgr.restart_system()  # Call the system manager's restart method
+
         
     async def update_sensor_display(self, temperature, humidity, pressure, lux, gas, mic):
         self.draw_display_mode_title("Sensors")
@@ -293,36 +304,26 @@ class PicoEnviroPlusDisplayMgr:
             await self.update_log_display()  # Final update before exiting
             raise  # Re-raise the CancelledError to properly handle task cancellation
 
-
     def clear_logs(self):
         self.log_mgr.clear_logs()
         self.log_mgr.log("Logs cleared")
-
-    def toggle_log_speed(self):
-        self.log_speed = 3 if self.log_speed == 1 else 1
-        self.log_mgr.log(f"Log speed set to {self.log_speed}")
-
-    async def scroll_logs(self):
-        while self.enviro_plus.display_mode == "Log":
-            total_logs = len(self.log_mgr.get_logs())
-            self.log_scroll_position = (self.log_scroll_position + self.log_speed) % max(1, total_logs - self.lines_per_screen + 1)
-            await self.update_log_display()
-            await asyncio.sleep(0.5)  # Adjust for smooth scrolling
 
     async def update_system_display(self, system_data):
         self.draw_display_mode_title("System")
         
         # Display system data
         y_offset = 35
+        self.display.text(f"Uptime: {system_data['uptime']}", 5, y_offset, scale=2)
+        y_offset += 25
+        self.display.line(0, y_offset - 6, self.DISPLAY_WIDTH, y_offset - 6, 2)
+        y_offset += 25
         self.display.text(f"CPU Temp: {system_data['chip_temperature']:.1f}C", 5, y_offset, scale=2)
         y_offset += 25
-        self.display.text(f"CPU Freq: {system_data['cpu_frequency']/1000000:.0f}MHz", 5, y_offset, scale=2)
+        self.display.text(f"CPU Freq: {system_data['cpu_frequency']:.2f}MHz", 5, y_offset, scale=2)
         y_offset += 25
         self.display.text(f"CPU Usage: {system_data['cpu_usage']:.1f}%", 5, y_offset, scale=2)
         y_offset += 25
         self.display.text(f"RAM Usage: {system_data['ram_usage']:.1f}%", 5, y_offset, scale=2)
-        y_offset += 25
-        self.display.text(f"Uptime: {system_data['uptime']}", 5, y_offset, scale=2)
         
         self.draw_button_labels()
         self.display.update()

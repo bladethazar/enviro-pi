@@ -7,8 +7,10 @@ import micropython
 from managers.led_manager import LEDManager
 
 class SystemManager:
-    def __init__(self, config):
+    def __init__(self, config, log_mgr, data_mgr):
         self.client_name = config.MQTT_CLIENT_NAME
+        self.log_mgr = log_mgr
+        self.data_mgr = data_mgr
         self.ADC_PINS = config.ADC_PINS_TO_MONITOR if hasattr(config, 'ADC_PINS_TO_MONITOR') else []
         self.adc_readings = {}
         self.internal_voltage = 0
@@ -32,6 +34,28 @@ class SystemManager:
         while True:
             self.update_status()
             await uasyncio.sleep_ms(100)
+            
+    def clear_memory(self):
+        self.log_mgr.log("Clearing system memory")
+        
+        # Clear log buffer
+        self.log_mgr.clear_logs()
+
+        # Clear system manager's own caches
+        self.adc_readings.clear()
+        self.errors.clear()
+        self.processing_tasks.clear()
+        
+        # Perform garbage collection
+        gc.collect()
+        
+        self.log_mgr.log("System memory cleared")
+    
+    def restart_system(self):
+        self.log_mgr.log("System restart initiated by SystemManager")
+        # Perform any necessary cleanup here
+        utime.sleep(1)  # Short delay to allow for cleanup
+        machine.reset()  # Perform a soft reset of the system
 
     def update_status(self):
         if self.errors:
@@ -83,7 +107,7 @@ class SystemManager:
             voltage = (raw * 3.3) / 65535
             return voltage
         except Exception as e:
-            print(f"Error reading ADC pin {adc_pin}: {e}")
+            self.log_mgr.log(f"Error reading ADC pin {adc_pin}: {e}")
             return 0
 
     def check_system(self):
@@ -93,7 +117,7 @@ class SystemManager:
             temperature = 27 - (reading - 0.706) / 0.001721
             return machine.ADC(29).read_u16() * (3.3 / 65535), temperature
         except Exception as e:
-            print(f"Error reading system data: {e}")
+            self.log_mgr.log(f"Error reading system data: {e}")
             return 0, 0
 
     def update_system_data(self):
@@ -133,11 +157,11 @@ class SystemManager:
         ram_usage = self.get_ram_usage()
         
         if ram_usage > self.mem_alloc_threshold:
-            print(f"Warning: High memory usage ({ram_usage:.2%}). Performing garbage collection.")
+            self.log_mgr.log(f"Warning: High memory usage ({ram_usage:.2%}). Performing garbage collection.")
             gc.collect()
         
         if cpu_usage > self.cpu_usage_threshold:
-            print(f"Warning: High CPU usage ({cpu_usage:.2%}). Consider optimizing or reducing workload.")
+            self.log_mgr.log(f"Warning: High CPU usage ({cpu_usage:.2%}). Consider optimizing or reducing workload.")
         
         return cpu_usage, ram_usage
 
@@ -150,7 +174,7 @@ class SystemManager:
             "system": {
                 "internal_voltage": round(self.internal_voltage, 2),
                 "chip_temperature": round(self.chip_temperature, 2),
-                "cpu_frequency": self.cpu_freq,
+                "cpu_frequency": self.data_mgr.adjust_cpu_frequency(self.cpu_freq),
                 "cpu_usage": round(cpu_usage * 100, 2),
                 "ram_usage": round(ram_usage * 100, 2),
                 "timestamp": timestamp,
@@ -187,10 +211,10 @@ class SystemManager:
 
     def print_system_data(self):
         mqtt_data, influx_data = self.get_system_data()
-        print("System Data:")
+        self.log_mgr.log("System Data:")
         for category, values in mqtt_data.items():
-            print(f"  {category}:")
+            self.log_mgr.log(f"  {category}:")
             for key, value in values.items():
-                print(f"    {key}: {value}")
-        print("---")
+                self.log_mgr.log(f"    {key}: {value}")
+        self.log_mgr.log("---")
         
