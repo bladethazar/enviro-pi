@@ -186,7 +186,7 @@ class PicoEnviroPlusDisplayMgr:
         status_color = self.GREEN if sensor_data['env_status'] == "Optimal" else self.YELLOW
         self.display.set_pen(status_color)
         self.display.circle(left_column + 5, y_offset + 10, 10)
-        self.display.text(sensor_data['env_status'], left_column + 25, y_offset + 3, scale=2)
+        self.display.text(sensor_data['env_status'], left_column + 25, y_offset, scale=2)
         # Display issues if any
         if sensor_data['env_issues']:
             y_offset += 20
