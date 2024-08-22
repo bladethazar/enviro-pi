@@ -53,9 +53,23 @@ class M5WateringUnit:
     def read_moisture(self):
         try:
             raw_value = self.moisture_sensor.read_u16()
-            moisture_percent = ((self.MOISTURE_SENSOR_DRY_VALUE - raw_value) / 
-                                (self.MOISTURE_SENSOR_DRY_VALUE - self.MOISTURE_SENSOR_WET_VALUE)) * 100
-            return max(0, min(100, moisture_percent))
+            
+            # Calculate moisture percentage
+            moisture_range = self.MOISTURE_SENSOR_DRY_VALUE - self.MOISTURE_SENSOR_WET_VALUE
+            if moisture_range == 0:
+                self.log_manager.log("Error: Moisture sensor not properly calibrated")
+                return None
+
+            # Correct calculation: 100% when raw_value is at or below WET_VALUE, 0% when at or above DRY_VALUE
+            if raw_value <= self.MOISTURE_SENSOR_WET_VALUE:
+                moisture_percent = 100.0
+            elif raw_value >= self.MOISTURE_SENSOR_DRY_VALUE:
+                moisture_percent = 0.0
+            else:
+                moisture_percent = ((self.MOISTURE_SENSOR_DRY_VALUE - raw_value) / moisture_range) * 100
+
+            moisture_percent = max(0, min(100, moisture_percent))
+            return moisture_percent
         except Exception as e:
             self.log_manager.log(f"Error reading moisture: {e}")
             return None
@@ -134,13 +148,13 @@ class M5WateringUnit:
             self.log_manager.log(f"Soil moisture level: {self.current_moisture:.2f}%")
 
             if self.current_moisture < self.MOISTURE_THRESHOLD:
-                self.log_manager.log("Moisture below threshold")
+                self.log_manager.log(f"Moisture below threshold ({self.MOISTURE_THRESHOLD}%)")
                 if self.auto_watering:
                     if (self.watering_cycles < self.WATERING_MAX_CYCLES and 
                         self.water_tank.get_capacity() > 0 and 
                         not self.watering_cycle_pause_flag):
                         self.log_manager.log("Starting watering")
-                        self.trigger_watering()
+                        await self.trigger_watering()
                     else:
                         self.log_manager.log("Cannot start watering")
                         await self.handle_watering_limits()
