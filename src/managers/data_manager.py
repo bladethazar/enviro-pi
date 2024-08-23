@@ -1,9 +1,13 @@
 import math
 import utime
+import ntptime
+import machine
 
 class DataManager:
-    def __init__(self, config):
+    def __init__(self, config, log_mgr, system_mgr):
         self.config = config
+        self.log_manager = log_mgr
+        self.system_mgr = system_mgr
 
     def correct_temperature_reading(self, temperature):
         return temperature - self.config.TEMPERATURE_OFFSET
@@ -37,15 +41,26 @@ class DataManager:
         return cpu_frequency / 1000000
     
     def interpret_mic_reading(self, mic):
+        # Define the range of the microphone input
+        MIC_MIN = 30000
+        MIC_MAX = 65535  # Assuming 16-bit ADC
+
+        # Define the desired dB range
+        DB_MIN = 30  # Lowest reading (very quiet)
+        DB_MAX = 120  # Highest reading (very loud)
+
         # Normalize the mic reading to a 0-1 range
-        # Assuming the mic reading ranges from 30000 to 36000 based on observed values
-        normalized = (mic - 30000) / (36000 - 30000)
-        
-        # Convert to a dB-like scale from 0 to 60
-        # This gives us a range of values that might be more intuitive
-        db_like = 60 * normalized
-    
-        return round(db_like, 1)
+        normalized = (mic - MIC_MIN) / (MIC_MAX - MIC_MIN)
+
+        # Convert to logarithmic dB scale
+        # Using the formula: dB = 20 * log10(amplitude)
+        if normalized > 0:
+            db_value = 20 * math.log10(normalized) + DB_MIN
+        else:
+            db_value = DB_MIN
+
+        # Ensure the value is within the expected range
+        return max(DB_MIN, min(DB_MAX, db_value))
     
     def describe_light(self, lux):
         if lux < self.config.LIGHT_THRESHOLD_VERY_LOW:
@@ -70,10 +85,7 @@ class DataManager:
             issues.append("Humidity")
             env_status = "Suboptimal"
 
-        # Check light conditions
-        current_time = utime.localtime()
-        current_hour = current_time[3]  # Hour is at index 3 in the time tuple
-
+        current_hour = self.system_mgr.get_local_hour()
         start_hour = self.config.LIGHT_SCHEDULE_START_HOUR
         end_hour = self.config.LIGHT_SCHEDULE_END_HOUR
 

@@ -1,6 +1,7 @@
 import machine
 from machine import ADC, Pin, freq
 import utime
+import ntptime
 import uasyncio
 import gc
 import micropython
@@ -26,6 +27,39 @@ class SystemManager:
         self.led_manager = None
         self.processing_tasks = set()
         self.errors = set()
+        self.time_offset = config.DST_HOURS * 3600  # 2 hours offset for summer time (CEST)
+
+    def sync_time(self, max_retries=5):
+        for i in range(max_retries):
+            try:
+                ntptime.settime()
+                self.log_mgr.log("Time synchronized successfully with NTP")
+                return True
+            except Exception as e:
+                self.log_mgr.log(f"Error synchronizing time (attempt {i+1}/{max_retries}): {str(e)}")
+                utime.sleep(1)
+        
+        self.log_mgr.log("Failed to sync time with NTP, setting time from compile time")
+        self.set_time_from_compile()
+        return False
+
+    def set_time_from_compile(self):
+        compile_time = utime.localtime()
+        machine.RTC().datetime((compile_time[0], compile_time[1], compile_time[2], compile_time[6], compile_time[3], compile_time[4], compile_time[5], 0))
+        self.log_mgr.log(f"Time set from compile time: {compile_time}")
+
+    def get_local_time(self):
+        return utime.localtime(utime.time() + self.time_offset)
+
+    def get_local_hour(self):
+        local_time = self.get_local_time()
+        return local_time[3]  # Hour is at index 3 in the time tuple
+
+    def format_time(self, time_tuple):
+        return "{:04d}-{:02d}-{:02d} {:02d}:{:02d}:{:02d}".format(
+            time_tuple[0], time_tuple[1], time_tuple[2],
+            time_tuple[3], time_tuple[4], time_tuple[5]
+        )
 
     def set_led(self, led):
         self.led_manager = LEDManager(led)

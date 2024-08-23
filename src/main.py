@@ -25,8 +25,9 @@ PicoWConfig.load_from_file()
 
 # Managers
 log_mgr = LogManager(PicoWConfig)
-data_mgr = DataManager(PicoWConfig)
-system_mgr = SystemManager(PicoWConfig, log_mgr, data_mgr)
+system_mgr = SystemManager(PicoWConfig, log_mgr, None)  # Pass None for data_mgr initially
+data_mgr = DataManager(PicoWConfig, log_mgr, system_mgr)
+system_mgr.data_mgr = data_mgr  # Now set the data_mgr in system_mgr
 wifi_mgr = WiFiManager(PicoWConfig, log_mgr)
 mqtt_mgr = MQTTManager(PicoWConfig, log_mgr)
 
@@ -184,6 +185,12 @@ async def startup_sequence():
             wdt.feed()  # Feed the watchdog after WiFi connection attempt
         except uasyncio.TimeoutError:
             log_mgr.log("WiFi connection timed out")
+            
+        # Synchronize time
+        if system_mgr.sync_time():
+            log_mgr.log("Time synchronized successfully")
+        else:
+            log_mgr.log("Failed to synchronize time")
         
         # Allow some time for final logs to be displayed
         await uasyncio.sleep(2)

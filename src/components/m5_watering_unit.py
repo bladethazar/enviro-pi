@@ -13,14 +13,14 @@ class M5WateringUnit:
         self.auto_watering = False
         
         # Initialize pins
-        self.moisture_sensor = ADC(config.MOISTURE_SENSOR_PIN_NR)
-        self.water_pump = Pin(config.WATER_PUMP_PIN_NR, Pin.OUT)
+        self.moisture_sensor = ADC(config.M5_MOISTURE_SENSOR_PIN_NR)
+        self.water_pump = Pin(config.M5_WATER_PUMP_PIN_NR, Pin.OUT)
         
         # Configuration values
-        self.MOISTURE_SENSOR_DRY_VALUE = config.MOISTURE_SENSOR_DRY_VALUE
-        self.MOISTURE_SENSOR_WET_VALUE = config.MOISTURE_SENSOR_WET_VALUE
-        self.MOISTURE_THRESHOLD = config.MOISTURE_THRESHOLD
-        self.WATER_PUMP_FLOW_RATE = config.WATER_PUMP_FLOW_RATE
+        self.MOISTURE_SENSOR_DRY_VALUE = config.M5_MOISTURE_SENSOR_DRY_VALUE
+        self.MOISTURE_SENSOR_WET_VALUE = config.M5_MOISTURE_SENSOR_WET_VALUE
+        self.MOISTURE_THRESHOLD = config.M5_MOISTURE_THRESHOLD
+        self.WATER_PUMP_FLOW_RATE = config.M5_WATER_PUMP_FLOW_RATE
         self.WATERING_DURATION = config.WATERING_DURATION
         self.WATERING_MAX_CYCLES = config.WATERING_MAX_CYCLES
         self.WATERING_PAUSE_DURATION = config.WATERING_PAUSE_DURATION
@@ -53,6 +53,7 @@ class M5WateringUnit:
     def read_moisture(self):
         try:
             raw_value = self.moisture_sensor.read_u16()
+            self.log_manager.log(f"Moisture value: {raw_value}")
             
             # Calculate moisture percentage
             moisture_range = self.MOISTURE_SENSOR_DRY_VALUE - self.MOISTURE_SENSOR_WET_VALUE
