@@ -16,6 +16,7 @@ from managers.pp_enviro_plus_display_mgr import PicoEnviroPlusDisplayMgr
 from components.m5_watering_unit import M5WateringUnit
 from components.pp_enviro_plus import PicoEnviroPlus
 from components.water_tank import WaterTank
+from components.momentary_button import MomentaryButton 
 
 # Enable emergency exception buffer
 micropython.alloc_emergency_exception_buf(100)
@@ -37,6 +38,7 @@ m5_watering_unit = M5WateringUnit(PicoWConfig, log_mgr, water_tank)
 enviro_plus = PicoEnviroPlus(PicoWConfig, log_mgr, data_mgr, water_tank.reset_capacity, m5_watering_unit)
 enviro_plus.init_sensors()
 enviro_plus_led = enviro_plus.get_led()
+external_watering_button = MomentaryButton(PicoWConfig.MOMENTARY_BUTTON_PIN)
 
 # Set up SystemManager with LED
 system_mgr.set_led(enviro_plus_led)
@@ -59,9 +61,25 @@ enviro_plus.set_system_manager(system_mgr)
 current_status = "running"
 last_mqtt_publish = 0
 last_moisture_check = 0
+external_watering_button_pressed = False
+
 
 # Watchdog timer
 wdt = machine.WDT(timeout=8000)  # 8 second timeout
+
+async def check_external_watering_button():
+    global external_watering_button_pressed
+    while True:
+        if external_watering_button.is_pressed():
+            external_watering_button_pressed = True
+        await uasyncio.sleep_ms(100)
+
+async def handle_external_watering_button():
+    global external_watering_button_pressed
+    if external_watering_button_pressed:
+        log_mgr.log("External watering button pressed")
+        await m5_watering_unit.trigger_watering()
+        external_watering_button_pressed = False
 
 async def read_sensors():
     sensor_data = enviro_plus.get_sensor_data()
@@ -127,6 +145,10 @@ async def update_display(sensor_data):
             await enviro_plus_display_mgr.update_system_display(system_data[0]['system'])
     except Exception as e:
         log_mgr.log(f"Error updating display: {e}")
+        
+def on_display_mode_change(new_mode):
+    log_mgr.log(f"Display mode changed to: {new_mode}")
+    uasyncio.create_task(update_display(None, force_update=True))
 
 async def handle_mqtt_publishing(sensor_data):
     global last_mqtt_publish
@@ -191,6 +213,8 @@ async def startup_sequence():
             log_mgr.log("Time synchronized successfully")
         else:
             log_mgr.log("Failed to synchronize time")
+            
+        # external_button.set_callback(external_button_callback)
         
         # Allow some time for final logs to be displayed
         await uasyncio.sleep(2)
@@ -217,12 +241,17 @@ async def startup_sequence():
 async def main_loop():
     log_mgr.log("Starting main loop...")
     await startup_sequence()
+    # Set up the display mode change callback
+    enviro_plus.on_display_mode_change = on_display_mode_change
     uasyncio.create_task(enviro_plus.run())
     uasyncio.create_task(system_mgr.run())  # Start the SystemManager task
+    uasyncio.create_task(check_external_watering_button())
     while True:
         try:
             gc.collect()
             system_mgr.update_system_data()
+            
+            await handle_external_watering_button()
 
             sensor_data = await read_sensors()
             if sensor_data is None:
@@ -231,12 +260,10 @@ async def main_loop():
                 continue
 
             await handle_watering()
-            enviro_plus.check_buttons()
             
-            if enviro_plus.display_mode == "Log":
-                await enviro_plus_display_mgr.update_log_display()
-            else:
-                await update_display(sensor_data)
+            enviro_plus.check_buttons()
+
+            await update_display(sensor_data)
             
             if sensor_data.get('status', 0) & STATUS_HEATER_STABLE:
                 await handle_mqtt_publishing(sensor_data)
