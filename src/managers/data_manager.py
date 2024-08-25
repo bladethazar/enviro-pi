@@ -42,25 +42,25 @@ class DataManager:
     
     def interpret_mic_reading(self, mic):
         # Define the range of the microphone input
-        MIC_MIN = 30000
+        MIC_MIN = 33000  # Adjusted based on your silent readings
         MIC_MAX = 65535  # Assuming 16-bit ADC
 
         # Define the desired dB range
-        DB_MIN = 30  # Lowest reading (very quiet)
-        DB_MAX = 120  # Highest reading (very loud)
+        DB_MIN = 10  # Lowest reading (very quiet room)
+        DB_MAX = 110  # Highest reading (very loud)
 
         # Normalize the mic reading to a 0-1 range
-        normalized = (mic - MIC_MIN) / (MIC_MAX - MIC_MIN)
+        normalized = max(0, min(1, (mic - MIC_MIN) / (MIC_MAX - MIC_MIN)))
 
         # Convert to logarithmic dB scale
-        # Using the formula: dB = 20 * log10(amplitude)
+        # Using a modified formula to give more realistic values
         if normalized > 0:
-            db_value = 20 * math.log10(normalized) + DB_MIN
+            db_value = DB_MIN + (DB_MAX - DB_MIN) * (math.log10(1 + 9 * normalized) / math.log10(10))
         else:
             db_value = DB_MIN
 
         # Ensure the value is within the expected range
-        return max(DB_MIN, min(DB_MAX, db_value))
+        return round(max(DB_MIN, min(DB_MAX, db_value)), 1)
     
     def describe_light(self, lux):
         if lux < self.config.LIGHT_THRESHOLD_VERY_LOW:

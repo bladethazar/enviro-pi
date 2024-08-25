@@ -194,7 +194,7 @@ class PicoEnviroPlusDisplayMgr:
             self.display.text(f"Issues: {sensor_data['env_issues']}", left_column + 25, y_offset, scale=1.5)
 
         # Draw line at a consistent position
-        y_offset = 55  # Set a fixed y_offset for the line
+        y_offset = 65  # Set a fixed y_offset for the line
         self.display.set_pen(self.WHITE)
         self.display.line(0, y_offset, self.DISPLAY_WIDTH, y_offset, 1)
         
@@ -237,57 +237,18 @@ class PicoEnviroPlusDisplayMgr:
         self.display.text(f"Air Quality: {sensor_data['gas_quality']}", left_column, y_offset, scale=2)
         
         y_offset += 20
-        bar_x = left_column
-        bar_y = y_offset
-        bar_width = self.DISPLAY_WIDTH - 2 * left_column
-        bar_height = 15
-        self.draw_sound_level_bar(sensor_data['mic'], bar_x, bar_y, bar_width, bar_height)
+        if 'mic' in sensor_data:
+            mic_value = sensor_data['mic']
+            if isinstance(mic_value, (int, float)):
+                self.display.text(f"Sound: {mic_value:.1f} dB", left_column, y_offset, scale=2)
+            else:
+                self.display.text("Sound: N/A", left_column, y_offset, scale=2)
+        else:
+            self.display.text("Sound: N/A", left_column, y_offset, scale=2)
 
         self.draw_button_labels()
         self.display.update()
         
-    def draw_sound_level_bar(self, mic_value, x, y, width, height):
-        # Normalize the mic value to a 0-1 range
-        # mic_value is now in dB scale from 30 to 120
-        normalized = (mic_value - 30) / 90
-
-        # Calculate the fill width
-        fill_width = int(normalized * width)
-
-        # Draw the label
-        self.display.set_pen(self.WHITE)
-        self.display.text("Sound-bar:", x, y - 15, scale=1.5)
-
-        # Draw the empty bar
-        self.display.rectangle(x, y, width, height)
-
-        # Fill the bar based on the sound level
-        if normalized > 0.66:
-            self.display.set_pen(self.RED)
-        elif normalized > 0.33:
-            self.display.set_pen(self.YELLOW)
-        else:
-            self.display.set_pen(self.GREEN)
-        self.display.rectangle(x, y, fill_width, height)
-
-        # Add tick marks and labels
-        self.draw_tick_marks(x, y, width, height)
-
-        # Add dB value at the end of the bar
-        self.display.set_pen(self.WHITE)
-        db_text = f"{mic_value:.1f}dB"
-        text_width = self.display.measure_text(db_text, scale=1.5)
-        self.display.text(db_text, x + width - text_width, y + height + 2, scale=1.5)
-
-    def draw_tick_marks(self, x, y, width, height):
-        self.display.set_pen(self.WHITE)
-        tick_positions = [0, 0.33, 0.66, 1]
-        for pos in tick_positions:
-            tick_x = x + int(pos * width)
-            self.display.line(tick_x, y + height, tick_x, y + height + 5)
-            if pos > 0:
-                db_value = 30 + pos * 90
-                self.display.text(f"{db_value:.0f}", tick_x - 10, y + height + 7, scale=1)
 
     async def update_watering_display(self, watering_unit_data):
         self.draw_display_mode_title("H²O")
