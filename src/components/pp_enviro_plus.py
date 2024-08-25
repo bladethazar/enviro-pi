@@ -68,7 +68,7 @@ class PicoEnviroPlus:
             self.bme = BreakoutBME68X(i2c, address=0x77)
             self.ltr = BreakoutLTR559(i2c)
             self.adcfft = ADCFFT()
-            self.mic = ADC(Pin(self.config.MICROPHONE_PIN))
+            self.mic = ADC(Pin(self.config.ENVIRO_PLUS_MICROPHONE_PIN))
             self.log_manager.log("Sensors initialized successfully")
         except Exception as e:
             self.log_manager.log(f"Error initializing sensors: {e}")

@@ -194,7 +194,7 @@ class PicoEnviroPlusDisplayMgr:
             self.display.text(f"Issues: {sensor_data['env_issues']}", left_column + 25, y_offset, scale=1.5)
 
         # Draw line at a consistent position
-        y_offset = 55  # Set a fixed y_offset for the line
+        y_offset = 65  # Set a fixed y_offset for the line
         self.display.set_pen(self.WHITE)
         self.display.line(0, y_offset, self.DISPLAY_WIDTH, y_offset, 1)
         
@@ -246,10 +246,9 @@ class PicoEnviroPlusDisplayMgr:
         else:
             self.display.text("Sound: N/A", left_column, y_offset, scale=2)
 
-
-
         self.draw_button_labels()
         self.display.update()
+        
 
     async def update_watering_display(self, watering_unit_data):
         self.draw_display_mode_title("H²O")
