@@ -28,18 +28,18 @@ class M5WateringUnit:
         # State variables
         self.current_moisture = self.read_moisture()
         self.water_used = 0
+        self.last_watered = 0
         self.watering_cycles = 0
         self.is_watering = False
         self.watered_time = 0
         self.watering_pause_start_time = 0
         self.watering_cycle_pause_flag = False
         self.last_watering_check_time = 0
-        self.last_watered = 0
         self.watering_block_timer = 0 
         
         self.lock = _thread.allocate_lock()
         
-        self.log_manager.log("Initialized M5WateringUnit successfully!")
+        self.log_manager.log("M5WateringUnit initialized.")
 
     def set_system_manager(self, system_manager):
         self.system_manager = system_manager
@@ -53,12 +53,12 @@ class M5WateringUnit:
     def read_moisture(self):
         try:
             raw_value = self.moisture_sensor.read_u16()
-            self.log_manager.log(f"Moisture value: {raw_value}")
+            self.log_manager.log(f"M5 moisture value: {raw_value}")
             
             # Calculate moisture percentage
             moisture_range = self.MOISTURE_SENSOR_DRY_VALUE - self.MOISTURE_SENSOR_WET_VALUE
             if moisture_range == 0:
-                self.log_manager.log("Error: Moisture sensor not properly calibrated")
+                self.log_manager.log("Error: M5 moisture sensor not properly calibrated")
                 return None
 
             # Correct calculation: 100% when raw_value is at or below WET_VALUE, 0% when at or above DRY_VALUE
@@ -72,7 +72,7 @@ class M5WateringUnit:
             moisture_percent = max(0, min(100, moisture_percent))
             return moisture_percent
         except Exception as e:
-            self.log_manager.log(f"Error reading moisture: {e}")
+            self.log_manager.log(f"Error reading moisture(M5): {e}")
             return None
 
     async def control_pump(self, duration):
@@ -108,7 +108,7 @@ class M5WateringUnit:
     
     def reset_water_used(self):
         self.water_used = 0
-        self.log_manager.log("Watering Unit 1 - water_used value reset")
+        self.log_manager.log("Watering Unit - water_used value reset")
         
     def get_time_since_last_watered(self):
         if self.last_watered == 0:
@@ -137,24 +137,22 @@ class M5WateringUnit:
             }
 
     async def check_moisture_and_watering_status(self):
-        self.log_manager.log("Starting moisture and watering status check")
         with self.lock:
             self.current_moisture = self.read_moisture()
             if self.current_moisture is None:
-                self.log_manager.log("Failed to read moisture. Skipping watering check.")
+                self.log_manager.log("Failed to read M5 moisture. Skipping watering check.")
                 if self.system_manager:
-                    self.system_manager.add_error("moisture_read")
+                    self.system_manager.add_error("M5 moisture_read")
                 return
 
-            self.log_manager.log(f"Soil moisture level: {self.current_moisture:.2f}%")
+            self.log_manager.log(f"M5 moisture level: {self.current_moisture:.2f}%")
 
             if self.current_moisture < self.MOISTURE_THRESHOLD:
-                self.log_manager.log(f"Moisture below threshold ({self.MOISTURE_THRESHOLD}%)")
+                self.log_manager.log(f"M5 moisture below threshold ({self.MOISTURE_THRESHOLD}%)")
                 if self.auto_watering:
                     if (self.watering_cycles < self.WATERING_MAX_CYCLES and 
                         self.water_tank.get_capacity() > 0 and 
                         not self.watering_cycle_pause_flag):
-                        self.log_manager.log("Starting watering")
                         await self.trigger_watering()
                     else:
                         self.log_manager.log("Cannot start watering")
@@ -162,9 +160,7 @@ class M5WateringUnit:
                 else:
                     self.log_manager.log("Automated watering deactivated")
             else:
-                self.log_manager.log("Soil moisture is okay.")
                 self.watering_cycles = 0
-            self.log_manager.log("Moisture and watering status check completed")
 
     async def trigger_watering(self):
         if not self.is_watering:

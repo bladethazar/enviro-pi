@@ -20,8 +20,8 @@ class PicoEnviroPlus:
         self.m5_watering_unit = m5_watering_unit
         self.reset_water_tank_capacity = reset_water_tank_capacity
         self.trigger_watering = self.m5_watering_unit.trigger_watering
-        self.reset_water_used_unit_1 = self.m5_watering_unit.reset_water_used
-        self.toggle_auto_watering_unit_1 = self.m5_watering_unit.toggle_auto_watering
+        self.reset_water_used = self.m5_watering_unit.reset_water_used
+        self.toggle_auto_watering = self.m5_watering_unit.toggle_auto_watering
 
         # Initialize display
         self.display = PicoGraphics(display=DISPLAY_ENVIRO_PLUS, rotate=90)
@@ -57,7 +57,7 @@ class PicoEnviroPlus:
         # Initialize sensors
         self.init_sensors()
 
-        self.log_manager.log("PicoEnviroPlus initialized successfully")
+        self.log_manager.log("PicoEnviroPlus initialized.")
 
     def set_system_manager(self, system_manager):
         self.system_manager = system_manager
@@ -69,9 +69,9 @@ class PicoEnviroPlus:
             self.ltr = BreakoutLTR559(i2c)
             self.adcfft = ADCFFT()
             self.mic = ADC(Pin(self.config.ENVIRO_PLUS_MICROPHONE_PIN))
-            self.log_manager.log("Sensors initialized successfully")
+            self.log_manager.log("PicoEnviroPlus sensors initialized.")
         except Exception as e:
-            self.log_manager.log(f"Error initializing sensors: {e}")
+            self.log_manager.log(f"Error initializing PicoEnviroPlus sensors: {e}")
 
     def read_sensors(self):
         try:
@@ -112,7 +112,7 @@ class PicoEnviroPlus:
             self.last_sensor_read = utime.ticks_ms()
             return self.sensor_data
         except Exception as e:
-            self.log_manager.log(f"Error reading sensors: {e}")
+            self.log_manager.log(f"Error reading PicoEnviroPlus sensors: {e}")
             if self.system_manager:
                 self.system_manager.add_error("sensor_read")
             return None
