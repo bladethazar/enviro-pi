@@ -250,7 +250,7 @@ class PicoEnviroPlusDisplayMgr:
         self.display.update()
         
 
-    async def update_watering_display(self, watering_unit_data):
+    async def update_watering_display(self, watering_unit_data, dfr_moisture_sensor_data):
         self.draw_display_mode_title("H²O")
         
         # Water tank capacity bar graph
@@ -260,9 +260,6 @@ class PicoEnviroPlusDisplayMgr:
         bar_x = 5
         bar_y = 35
         
-        # Update moisture history
-        self.update_moisture_history(watering_unit_data['moisture'])
-        min_moisture, max_moisture, _ = self.get_moisture_stats()
         
         self.display.set_pen(self.WHITE)
         self.display.rectangle(bar_x, bar_y, bar_width, bar_height)
@@ -274,11 +271,11 @@ class PicoEnviroPlusDisplayMgr:
         y_offset = bar_y
         self.display.set_pen(self.WHITE)
         
-        self.display.text(f"Moisture: {watering_unit_data['moisture']:.1f}%", x_offset, y_offset, scale=2)
+        # Display moisture
+        self.display.text(f"Moisture", x_offset, y_offset, scale=2)
         y_offset += 20
         
-        # Display min and max moisture
-        self.display.text(f"Min: {min_moisture:.1f}% | Max: {max_moisture:.1f}%", x_offset, y_offset, scale=1.5)
+        self.display.text(f"M5: {watering_unit_data['moisture']:.1f}% | DFR: {dfr_moisture_sensor_data:.1f}% ", x_offset, y_offset, scale=2)
         y_offset += 25
         
         self.display.line(25, y_offset - 10, self.DISPLAY_WIDTH, y_offset - 10, 1)
@@ -363,15 +360,6 @@ class PicoEnviroPlusDisplayMgr:
         self.draw_button_labels()
         self.display.update()
 
-    def update_moisture_history(self, current_moisture):
-        self.moisture_history.append(current_moisture)
-        if len(self.moisture_history) > self.history_limit:
-            self.moisture_history.pop(0)
-
-    def get_moisture_stats(self):
-        if not self.moisture_history:
-            return 0, 0, 0
-        return min(self.moisture_history), max(self.moisture_history), sum(self.moisture_history) / len(self.moisture_history)
 
     def cleanup_display(self):
         self.clear_display()
