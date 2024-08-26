@@ -17,6 +17,7 @@ from components.m5_watering_unit import M5WateringUnit
 from components.pp_enviro_plus import PicoEnviroPlus
 from components.water_tank import WaterTank
 from components.momentary_button import MomentaryButton 
+from components.dfr_moisture_sensor import DFRobotMoistureSensor
 
 # Enable emergency exception buffer
 micropython.alloc_emergency_exception_buf(100)
@@ -39,6 +40,7 @@ enviro_plus = PicoEnviroPlus(PicoWConfig, log_mgr, data_mgr, water_tank.reset_ca
 enviro_plus.init_sensors()
 enviro_plus_led = enviro_plus.get_led()
 external_watering_button = MomentaryButton(PicoWConfig.MOMENTARY_BUTTON_PIN)
+dfr_moisture_sensor = DFRobotMoistureSensor(PicoWConfig, log_mgr)
 
 # Set up SystemManager with LED
 system_mgr.set_led(enviro_plus_led)
@@ -81,7 +83,7 @@ async def handle_external_watering_button():
         await m5_watering_unit.trigger_watering()
         external_watering_button_pressed = False
 
-async def read_sensors():
+async def read_enviro_plus_sensors():
     sensor_data = enviro_plus.get_sensor_data()
     if sensor_data is None:
         return None
@@ -126,6 +128,7 @@ async def handle_watering():
         last_moisture_check = current_time
         await m5_watering_unit.check_moisture_and_watering_status()
         m5_watering_unit.update_status()
+        await dfr_moisture_sensor.check_moisture()
 
 async def update_display(sensor_data):
     if sensor_data is None:
@@ -136,8 +139,9 @@ async def update_display(sensor_data):
             await enviro_plus_display_mgr.update_sensor_display(sensor_data)
         elif enviro_plus.display_mode == "Watering":
             watering_unit_data = m5_watering_unit.get_current_data()
-            if watering_unit_data:
-                await enviro_plus_display_mgr.update_watering_display(watering_unit_data)
+            dfr_moisture_sensor_data = dfr_moisture_sensor.read_moisture()
+            if watering_unit_data and dfr_moisture_sensor_data:
+                await enviro_plus_display_mgr.update_watering_display(watering_unit_data, dfr_moisture_sensor_data)
         elif enviro_plus.display_mode == "Log":
             await enviro_plus_display_mgr.update_log_display()
         elif enviro_plus.display_mode == "System":
@@ -175,6 +179,7 @@ async def handle_mqtt_publishing(sensor_data):
                 }
                 prepared_mqtt_data = data_mgr.prepare_mqtt_sensor_data_for_publishing(
                     m5_watering_unit.get_current_data(),
+                    dfr_moisture_sensor.get_moisture_data(),
                     enviro_plus_data,
                     system_mgr.get_system_data()
                 )
@@ -187,11 +192,11 @@ async def handle_mqtt_publishing(sensor_data):
             log_mgr.log("MQTT connection failed, skipping publish")
 
 
-async def startup_sequence():
+async def startup():
     display_task = None
     try:
         log_mgr.enable_buffering()
-        log_mgr.log("Starting startup sequence...")
+        log_mgr.log("Starting PicoW-Growmat startup sequence...")
         enviro_plus.set_display_mode("Log")  # Set Log Mode for startup
 
         # Initialize WiFi
@@ -214,18 +219,20 @@ async def startup_sequence():
         else:
             log_mgr.log("Failed to synchronize time")
             
-        # external_button.set_callback(external_button_callback)
+        enviro_plus.on_display_mode_change = on_display_mode_change
+        
+        uasyncio.create_task(enviro_plus.run())
+        uasyncio.create_task(system_mgr.run())  # Start the SystemManager task
+        uasyncio.create_task(check_external_watering_button())
         
         # Allow some time for final logs to be displayed
         await uasyncio.sleep(2)
         
-        log_mgr.log("Startup sequence finished")
         enviro_plus.set_display_mode("Watering")  # Set Watering Mode as default after startup
     except RuntimeError as e:
         log_mgr.log(f"WiFi connection error: {e}")
     except Exception as e:
         log_mgr.log(f"Error in startup sequence: {e}")
-        print(f"Error in startup sequence: {e}")
         sys.print_exception(e)
     finally:
         # Ensure display task is always cancelled
@@ -235,17 +242,11 @@ async def startup_sequence():
                 await display_task
             except uasyncio.CancelledError:
                 pass
-        log_mgr.log("Startup sequence cleanup completed")
+        log_mgr.log("Startup sequence completed")
         wdt.feed()  # Final watchdog feed before exiting startup sequence
 
 async def main_loop():
-    log_mgr.log("Starting main loop...")
-    await startup_sequence()
-    # Set up the display mode change callback
-    enviro_plus.on_display_mode_change = on_display_mode_change
-    uasyncio.create_task(enviro_plus.run())
-    uasyncio.create_task(system_mgr.run())  # Start the SystemManager task
-    uasyncio.create_task(check_external_watering_button())
+    await startup()
     while True:
         try:
             gc.collect()
@@ -253,8 +254,8 @@ async def main_loop():
             
             await handle_external_watering_button()
 
-            sensor_data = await read_sensors()
-            if sensor_data is None:
+            enviro_plus_sensor_data = await read_enviro_plus_sensors()
+            if enviro_plus_sensor_data is None:
                 log_mgr.log("No sensor data available, skipping this iteration")
                 await uasyncio.sleep(5)
                 continue
@@ -263,10 +264,10 @@ async def main_loop():
             
             enviro_plus.check_buttons()
 
-            await update_display(sensor_data)
+            await update_display(enviro_plus_sensor_data)
             
-            if sensor_data.get('status', 0) & STATUS_HEATER_STABLE:
-                await handle_mqtt_publishing(sensor_data)
+            if enviro_plus_sensor_data.get('status', 0) & STATUS_HEATER_STABLE:
+                await handle_mqtt_publishing(enviro_plus_sensor_data)
             else:
                 log_mgr.log(" Gas sensor heater not stable, skipping MQTT publishing")
 

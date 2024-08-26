@@ -33,7 +33,6 @@ class SystemManager:
         for i in range(max_retries):
             try:
                 ntptime.settime()
-                self.log_mgr.log("Time synchronized successfully with NTP")
                 return True
             except Exception as e:
                 self.log_mgr.log(f"Error synchronizing time (attempt {i+1}/{max_retries}): {str(e)}")
