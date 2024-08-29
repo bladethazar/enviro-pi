@@ -223,15 +223,21 @@ class PicoEnviroPlusDisplayMgr:
         # Other sensor data
         y_offset += 35
         self.display.set_pen(self.WHITE)
-        self.display.text(f"Humidity: {sensor_data['humidity']:.1f}%", left_column, y_offset, scale=2)
-        
-        y_offset += 20
-        self.display.text(f"Pressure: {sensor_data['pressure']:.0f} hPa", left_column, y_offset, scale=2)
+        self.display.text(f"HUM: {sensor_data['humidity']:.1f}%", left_column, y_offset, scale=2)
+        self.display.text(f"AIR-P: {sensor_data['pressure']:.0f} hPa", right_column, y_offset, scale=2)
         
         y_offset += 20
         light_status = sensor_data.get('light_status', 'N/A')
-        self.display.text(f"Light: {sensor_data['lux']:.0f} lux", left_column, y_offset, scale=2)
+        self.display.text(f"LUX-O: {sensor_data['lux']:.0f}", left_column, y_offset, scale=2)
         self.display.text(f"({light_status})", right_column, y_offset, scale=2)
+        
+        y_offset += 20
+        self.display.text(f"LUX-I: {sensor_data['af_lux']:.1f}", left_column, y_offset, scale=2)
+        self.display.text(f"A-Light: {sensor_data['af_ambient_light']:.0f}", right_column, y_offset, scale=2)
+        y_offset += 20
+        self.display.text(f"UV: {sensor_data['af_uv']:.0f}", left_column, y_offset, scale=2)
+        self.display.text(f"UVI: {sensor_data['af_uvi']:.1f}", right_column, y_offset, scale=2)
+        
         
         y_offset += 20
         self.display.text(f"Air Quality: {sensor_data['gas_quality']}", left_column, y_offset, scale=2)
@@ -366,6 +372,7 @@ class PicoEnviroPlusDisplayMgr:
         self.display.text(f"Uptime: {system_data['uptime']}", 5, y_offset, scale=2)
         y_offset += 25
         self.display.line(0, y_offset - 6, self.DISPLAY_WIDTH, y_offset - 6, 2)
+        self.display.text(f"Voltage: {system_data['internal_voltage']:.2f}V", 5, y_offset, scale=2)
         y_offset += 25
         self.display.text(f"CPU Temp: {system_data['chip_temperature']:.1f}C", 5, y_offset, scale=2)
         y_offset += 25

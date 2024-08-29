@@ -18,6 +18,7 @@ from components.m5_watering_unit import M5WateringUnit
 from components.pp_enviro_plus import PicoEnviroPlus
 from components.water_tank import WaterTank
 from components.momentary_button import MomentaryButton 
+from components.af_ltr390 import AFLTR390 
 
 # Enable emergency exception buffer
 micropython.alloc_emergency_exception_buf(100)
@@ -37,7 +38,8 @@ influx_data_manager = InfluxDataManager(PicoWConfig, log_mgr)
 # Initialize components
 water_tank = WaterTank(PicoWConfig.WATER_TANK_FULL_CAPACITY, log_mgr)
 m5_watering_unit = M5WateringUnit(PicoWConfig, system_mgr, log_mgr, water_tank)
-enviro_plus = PicoEnviroPlus(PicoWConfig, log_mgr, data_mgr, water_tank.reset_capacity, m5_watering_unit)
+af_ltr390 = AFLTR390()
+enviro_plus = PicoEnviroPlus(PicoWConfig, log_mgr, data_mgr, af_ltr390, water_tank.reset_capacity, m5_watering_unit)
 enviro_plus.init_sensors()
 enviro_plus_led = enviro_plus.get_led()
 external_watering_button = MomentaryButton(PicoWConfig.MOMENTARY_BUTTON_PIN)
@@ -99,6 +101,11 @@ async def read_enviro_plus_sensors():
         mic = sensor_data.get('mic')
         env_status = sensor_data.get('env_status')
         env_issues = sensor_data.get('env_issues', [])
+        af_uv = sensor_data.get('af_uv')
+        af_uvi = sensor_data.get('af_uvi'),
+        af_ambient_light = sensor_data.get('af_ambient_light'),
+        af_lux = sensor_data.get('af_lux')
+        
         
         if None in (temperature, pressure, humidity, gas, lux, mic):
             return None
@@ -114,7 +121,11 @@ async def read_enviro_plus_sensors():
             "mic": mic,
             "status": sensor_data.get('status', 0),
             "env_status": env_status,
-            "env_issues": ','.join(env_issues) if env_issues else ''
+            "env_issues": ','.join(env_issues) if env_issues else '',
+            "af_uv": af_uv,
+            "af_uvi": af_uvi[0],
+            "af_ambient_light": af_ambient_light[0],
+            "af_lux": af_lux
         }
     except Exception as e:
         log_mgr.log(f"Error processing sensor data: {e}")
@@ -143,7 +154,7 @@ async def update_display(sensor_data):
             await enviro_plus_display_mgr.update_log_display()
         elif enviro_plus.display_mode == "System":
             system_data = system_mgr.get_system_data()
-            await enviro_plus_display_mgr.update_system_display(system_data[0]['system'])
+            await enviro_plus_display_mgr.update_system_display(system_data['system'])
     except Exception as e:
         log_mgr.log(f"Error updating display: {e}")
         
@@ -172,7 +183,11 @@ async def handle_mqtt_publishing(sensor_data):
                     "light_status": sensor_data['light_status'],
                     "mic": sensor_data['mic'],
                     "env_status": sensor_data['env_status'],
-                    "env_issues": sensor_data['env_issues']
+                    "env_issues": sensor_data['env_issues'],
+                    "af_uv": sensor_data['af_uv'],
+                    "af_uvi": sensor_data['af_uvi'],
+                    "af_ambient_light": sensor_data['af_ambient_light'],
+                    "af_lux": sensor_data['af_lux']
                 }
                 prepared_mqtt_data = data_mgr.prepare_mqtt_sensor_data_for_publishing(
                     m5_watering_unit.get_current_data(),
@@ -236,7 +251,7 @@ async def startup():
         # Allow some time for final logs to be displayed
         await uasyncio.sleep(2)
         
-        enviro_plus.set_display_mode("Watering")  # Set Watering Mode as default after startup
+        enviro_plus.set_display_mode(PicoWConfig.DEFAULT_DISPLAY_MODE)
     except RuntimeError as e:
         log_mgr.log(f"WiFi connection error: {e}")
     except Exception as e:
