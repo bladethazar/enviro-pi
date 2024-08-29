@@ -108,12 +108,11 @@ class DataManager:
 
         return env_status, issues, light_status
 
-    def prepare_mqtt_sensor_data_for_publishing(self, m5_watering_unit_data, dfr_moisture_sensor_data, enviro_plus_data, system_data):
+    def prepare_mqtt_sensor_data_for_publishing(self, m5_watering_unit_data, enviro_plus_data, system_data):
         try:
-            mqtt_data, _ = system_data  # Unpack the tuple, ignore the InfluxDB data
+            mqtt_data = system_data  # Unpack the tuple, ignore the InfluxDB data
             data = {
                 "m5-watering-unit": m5_watering_unit_data,
-                "dfr-moisture-sensor": dfr_moisture_sensor_data,
                 "enviro-plus": enviro_plus_data,
                 "system": mqtt_data["system"],
                 "adc": mqtt_data["adc"]
