@@ -9,6 +9,9 @@ from managers.led_manager import LEDManager
 
 class SystemManager:
     def __init__(self, config, log_mgr, data_mgr):
+        self.wdt = machine.WDT(timeout=8000)  # 8 second timeout
+        self.last_wdt_feed = utime.ticks_ms()
+        self.wdt_feed_interval = 1000 
         self.client_name = config.MQTT_CLIENT_NAME
         self.log_mgr = log_mgr
         self.data_mgr = data_mgr
@@ -28,6 +31,12 @@ class SystemManager:
         self.processing_tasks = set()
         self.errors = set()
         self.time_offset = config.DST_HOURS * 3600  # 2 hours offset for summer time (CEST)
+        
+    def feed_watchdog(self):
+        current_time = utime.ticks_ms()
+        if utime.ticks_diff(current_time, self.last_wdt_feed) >= self.wdt_feed_interval:
+            self.wdt.feed()
+            self.last_wdt_feed = current_time
 
     def sync_time(self, max_retries=5):
         for i in range(max_retries):
@@ -66,6 +75,7 @@ class SystemManager:
     async def run(self):
         while True:
             self.update_status()
+            self.feed_watchdog()
             await uasyncio.sleep_ms(100)
             
     def clear_memory(self):
@@ -216,31 +226,9 @@ class SystemManager:
             "adc": {f"adc_{pin}": round(self.adc_readings.get(f"adc_{pin}", 0), 2) for pin in self.ADC_PINS}
         }
 
-        influx_data = [
-            {
-                "measurement": "system_metrics",
-                "tags": {"device": self.client_name},
-                "fields": {
-                    "internal_voltage": mqtt_data["system"]["internal_voltage"],
-                    "chip_temperature": mqtt_data["system"]["chip_temperature"],
-                    "cpu_frequency": mqtt_data["system"]["cpu_frequency"],
-                    "cpu_usage": mqtt_data["system"]["cpu_usage"],
-                    "ram_usage": mqtt_data["system"]["ram_usage"]
-                },
-                "timestamp": timestamp
-            }
-        ]
 
-        influx_data.extend([
-            {
-                "measurement": "adc_readings",
-                "tags": {"device": self.client_name, "pin": pin},
-                "fields": {"voltage": voltage},
-                "timestamp": timestamp
-            } for pin, voltage in mqtt_data["adc"].items()
-        ])
 
-        return mqtt_data, influx_data
+        return mqtt_data
 
     def print_system_data(self):
         mqtt_data, influx_data = self.get_system_data()
