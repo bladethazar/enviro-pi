@@ -14,3 +14,7 @@ class WaterTank:
     def get_capacity(self):
         return self.water_tank_capacity
     
+    def set_capacity(self, capacity):
+        self.water_tank_capacity = capacity
+        self.log_manager.log(f"Set water_tank_capacity to: {capacity}")
+    

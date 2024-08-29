@@ -5,7 +5,8 @@ import _thread
 import gc
 
 class M5WateringUnit:
-    def __init__(self, config, log_manager, water_tank):
+    def __init__(self, config, system_manager, log_manager, water_tank):
+        self.system_manager = system_manager
         self.log_manager = log_manager
         self.system_manager = None
         self.config = config
@@ -40,6 +41,10 @@ class M5WateringUnit:
         self.lock = _thread.allocate_lock()
         
         self.log_manager.log("M5WateringUnit initialized.")
+        
+    def set_last_watered_time(self, last_watered):
+        self.last_watered = last_watered
+        self.log_manager.log(f"Set last_watered to: {last_watered}")
 
     def set_system_manager(self, system_manager):
         self.system_manager = system_manager
@@ -86,7 +91,15 @@ class M5WateringUnit:
                 self.system_manager.start_processing("watering")
             self.is_watering = True
             self.water_pump.on()
-            await uasyncio.sleep(duration)
+            
+            # Water in 5-second intervals
+            remaining_duration = duration
+            while remaining_duration > 0:
+                await uasyncio.sleep(min(5, remaining_duration))
+                remaining_duration -= 5
+                if self.system_manager:
+                    self.system_manager.feed_watchdog()  # Use SystemManager's method to feed the watchdog
+
             self.water_pump.off()
             self.watered_time += duration
             water_used = (duration / 60) * self.WATER_PUMP_FLOW_RATE
@@ -110,19 +123,7 @@ class M5WateringUnit:
         self.water_used = 0
         self.log_manager.log("Watering Unit - water_used value reset")
         
-    def get_time_since_last_watered(self):
-        if self.last_watered == 0:
-            return "Never"
-        
-        time_diff = utime.time() - self.last_watered
-        if time_diff < 60:
-            return f"{time_diff} sec ago"
-        elif time_diff < 3600:
-            return f"{time_diff // 60} min ago"
-        elif time_diff < 86400:
-            return f"{time_diff // 3600} hr ago"
-        else:
-            return f"{time_diff // 86400} days ago"
+
 
     def get_current_data(self):
         with self.lock:
@@ -130,7 +131,7 @@ class M5WateringUnit:
                 "moisture": round(self.current_moisture, 2) if self.current_moisture is not None else None,
                 "water_used": round(self.water_used, 2),
                 "water_left": round(self.water_tank.get_capacity(), 2),
-                "last_watered": self.get_time_since_last_watered(),
+                "last_watered": self.last_watered,
                 "watering_cycles": self.watering_cycles,
                 "watering_cycles_configured": self.WATERING_MAX_CYCLES,
                 "auto_watering": self.auto_watering
@@ -166,6 +167,7 @@ class M5WateringUnit:
         if not self.is_watering:
             self.log_manager.log(f"Manual watering triggered for {self.WATERING_DURATION} seconds.")
             await self.control_pump(self.WATERING_DURATION)
+            self.cleanup()
         else:
             self.log_manager.log("Watering already in progress. Please wait.")
 
