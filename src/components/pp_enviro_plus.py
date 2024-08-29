@@ -11,10 +11,11 @@ from adcfft import ADCFFT
 import gc
 
 class PicoEnviroPlus:
-    def __init__(self, config, log_manager, data_mgr, reset_water_tank_capacity, m5_watering_unit):
+    def __init__(self, config, log_manager, data_mgr, af_ltr390, reset_water_tank_capacity, m5_watering_unit):
         self.config = config
         self.log_manager = log_manager
         self.data_mgr = data_mgr
+        self.af_ltr390 = af_ltr390
         self.system_manager = None
         self.display_manager = None
         self.m5_watering_unit = m5_watering_unit
@@ -66,7 +67,7 @@ class PicoEnviroPlus:
         try:
             i2c = PimoroniI2C(sda=4, scl=5)
             self.bme = BreakoutBME68X(i2c, address=0x77)
-            self.ltr = BreakoutLTR559(i2c)
+            self.ltr559 = BreakoutLTR559(i2c)
             self.adcfft = ADCFFT()
             self.mic = ADC(Pin(self.config.ENVIRO_PLUS_MICROPHONE_PIN))
             self.log_manager.log("PicoEnviroPlus sensors initialized.")
@@ -76,38 +77,45 @@ class PicoEnviroPlus:
     def read_sensors(self):
         try:
             bme_data = self.bme.read()
-            ltr_data = self.ltr.get_reading()
+            ltr559_data = self.ltr559.get_reading()
+            ltr390_data = self.af_ltr390.read_sensor()
             mic_reading = self.mic.read_u16()
 
             temperature = bme_data[0]
             pressure = bme_data[1]
             humidity = bme_data[2]
             gas = bme_data[3]
-            lux = ltr_data[BreakoutLTR559.LUX] if ltr_data else 0
+            enviro_plus_lux = ltr559_data[BreakoutLTR559.LUX] if ltr559_data else 0
+            
+            
 
             corrected_temperature = self.data_mgr.correct_temperature_reading(temperature)
             self.set_temperature_edge_values(corrected_temperature)
             corrected_humidity = self.data_mgr.correct_humidity_reading(humidity, temperature, corrected_temperature)
             adjusted_pressure = self.data_mgr.adjust_to_sea_pressure(pressure, corrected_temperature, self.config.ALTITUDE)
-            adjusted_lux = self.data_mgr.adjust_lux_for_growhouse(lux)
+            adjusted_enviro_plus_lux = self.data_mgr.adjust_lux_for_growhouse(enviro_plus_lux)
+            
             gas_quality = self.data_mgr.interpret_gas_reading(gas)
             mic_db = self.data_mgr.interpret_mic_reading(mic_reading)
 
             env_status, issues, light_status = self.data_mgr.describe_growhouse_environment(
-                corrected_temperature, corrected_humidity, adjusted_lux)
-
+                corrected_temperature, corrected_humidity, adjusted_enviro_plus_lux)
             self.sensor_data = {
                 "temperature": corrected_temperature,
                 "humidity": corrected_humidity,
                 "pressure": adjusted_pressure,
                 "gas": gas,
                 "gas_quality": gas_quality,
-                "lux": adjusted_lux,
+                "lux": adjusted_enviro_plus_lux,
                 "light_status": light_status,
                 "mic": mic_db,
                 "status": bme_data[4],
                 "env_status": env_status,
-                "env_issues": issues
+                "env_issues": issues,
+                "af_uv": ltr390_data['uv'],
+                "af_uvi": ltr390_data['uvi'],
+                "af_ambient_light": ltr390_data['ambient_light'],
+                "af_lux": ltr390_data['lux']
             }
             self.last_sensor_read = utime.ticks_ms()
             return self.sensor_data
