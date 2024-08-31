@@ -47,7 +47,6 @@ class SystemManager:
                 self.log_mgr.log(f"Error synchronizing time (attempt {i+1}/{max_retries}): {str(e)}")
                 utime.sleep(1)
         
-        self.log_mgr.log("Failed to sync time with NTP, setting time from compile time")
         self.set_time_from_compile()
         return False
 

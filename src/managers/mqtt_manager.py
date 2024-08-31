@@ -1,3 +1,4 @@
+import json
 import uasyncio
 from umqtt_simple import MQTTClient
 import utime
@@ -10,6 +11,10 @@ class MQTTManager:
         self.is_connected = False
         self.last_publish_time = 0
         self.system_manager = None
+        self.m5_watering_unit = None
+
+    def set_m5_watering_unit(self, m5_watering_unit):
+        self.m5_watering_unit = m5_watering_unit
         
     def set_system_manager(self, system_manager):
         self.system_manager = system_manager
@@ -84,13 +89,47 @@ class MQTTManager:
         if self.is_connected:
             try:
                 self.client.subscribe(b"picow/control/#")
+                self.client.subscribe(b"picow/config/#")
                 self.log_mgr.log("MQTT control topics subscribed")
             except Exception as e:
                 self.log_mgr.log(f"Failed to subscribe to control topics: {e}")
+                
+    def update_config(self, key, value):
+        try:
+            if isinstance(value, str):
+                if value.lower() in ['true', 'false']:
+                    value = value.lower() == 'true'
+                elif value.replace('.', '').isdigit():
+                    value = float(value) if '.' in value else int(value)
+            
+            if self.config.update_config(key, value):
+                self.log_mgr.log(f"Configuration updated: {key} = {value}")
+            else:
+                self.log_mgr.log(f"Failed to update configuration: {key} = {value}")
+        except Exception as e:
+            self.log_mgr.log(f"Error updating configuration: {e}")
 
     def on_message(self, topic, msg):
+        topic = topic.decode('utf-8')
+        msg = msg.decode('utf-8').strip()
         self.log_mgr.log(f"MQTT message received on topic {topic}: {msg}")
-        # Handle incoming messages here
+        
+        if topic.startswith("picow/config/"):
+            _, _, key = topic.split('/')
+            self.update_config(key, msg)
+        elif topic == "picow/control/watering":
+            uasyncio.create_task(self.handle_watering_control(msg))
+
+    async def handle_watering_control(self, msg):
+        if self.m5_watering_unit is None:
+            self.log_mgr.log("Watering unit not set. Cannot trigger watering.")
+            return
+
+        if msg.lower() == "start":
+            self.log_mgr.log("Triggering watering via MQTT control")
+            await self.m5_watering_unit.trigger_watering()
+        else:
+            self.log_mgr.log(f"Unknown watering control command: {msg}")
 
     async def check_messages(self):
         if self.is_connected:
@@ -105,4 +144,4 @@ class MQTTManager:
             if not self.is_connected:
                 await self.connect()
             await self.check_messages()
-            await uasyncio.sleep(1)
+            await uasyncio.sleep(0.1)  # Check messages more frequently

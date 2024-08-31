@@ -6,7 +6,8 @@ import micropython
 import utime
 from breakout_bme68x import STATUS_HEATER_STABLE
 
-from config import PicoWConfig
+
+from managers.config_manager import ConfigManager
 from managers.wifi_manager import WiFiManager
 from managers.mqtt_manager import MQTTManager
 from managers.data_manager import DataManager
@@ -23,33 +24,32 @@ from components.af_ltr390 import AFLTR390
 # Enable emergency exception buffer
 micropython.alloc_emergency_exception_buf(100)
 
-# Load custom configuration from json-file
-PicoWConfig.load_from_file()
 
 # Managers
-log_mgr = LogManager(PicoWConfig)
-system_mgr = SystemManager(PicoWConfig, log_mgr, None)
-data_mgr = DataManager(PicoWConfig, log_mgr, system_mgr)
+log_mgr = LogManager()
+config_mgr = ConfigManager(log_mgr)
+system_mgr = SystemManager(config_mgr, log_mgr, None)
+data_mgr = DataManager(config_mgr, log_mgr, system_mgr)
 system_mgr.data_mgr = data_mgr  
-wifi_mgr = WiFiManager(PicoWConfig, log_mgr)
-mqtt_mgr = MQTTManager(PicoWConfig, log_mgr)
-influx_data_manager = InfluxDataManager(PicoWConfig, log_mgr)
+wifi_mgr = WiFiManager(config_mgr, log_mgr)
+mqtt_mgr = MQTTManager(config_mgr, log_mgr)
+influx_data_manager = InfluxDataManager(config_mgr, log_mgr)
 
 # Initialize components
-water_tank = WaterTank(PicoWConfig.WATER_TANK_FULL_CAPACITY, log_mgr)
-m5_watering_unit = M5WateringUnit(PicoWConfig, system_mgr, log_mgr, water_tank)
+water_tank = WaterTank(config_mgr.WATER_TANK_FULL_CAPACITY, log_mgr)
+m5_watering_unit = M5WateringUnit(config_mgr, system_mgr, log_mgr, water_tank)
 af_ltr390 = AFLTR390()
-enviro_plus = PicoEnviroPlus(PicoWConfig, log_mgr, data_mgr, af_ltr390, water_tank.reset_capacity, m5_watering_unit)
+enviro_plus = PicoEnviroPlus(config_mgr, log_mgr, data_mgr, af_ltr390, water_tank.reset_capacity, m5_watering_unit)
 enviro_plus.init_sensors()
 enviro_plus_led = enviro_plus.get_led()
-external_watering_button = MomentaryButton(PicoWConfig.MOMENTARY_BUTTON_PIN)
+external_watering_button = MomentaryButton(config_mgr.MOMENTARY_BUTTON_PIN)
 
 # Set up SystemManager with LED
 system_mgr.set_led(enviro_plus_led)
 
 # Init enviro+ display manager
-enviro_plus_display_mgr = PicoEnviroPlusDisplayMgr(PicoWConfig, enviro_plus, log_mgr, data_mgr, m5_watering_unit, system_mgr)
-enviro_plus_display_mgr.setup_display(PicoWConfig)
+enviro_plus_display_mgr = PicoEnviroPlusDisplayMgr(config_mgr, enviro_plus, log_mgr, data_mgr, m5_watering_unit, system_mgr)
+enviro_plus_display_mgr.setup_display(config_mgr)
 
 # Set display manager in enviro_plus
 enviro_plus.set_display_manager(enviro_plus_display_mgr)
@@ -134,7 +134,7 @@ async def read_enviro_plus_sensors():
 async def handle_watering():
     global last_moisture_check
     current_time = utime.time()
-    if current_time - last_moisture_check >= PicoWConfig.MOISTURE_CHECK_INTERVAL:
+    if current_time - last_moisture_check >= config_mgr.MOISTURE_CHECK_INTERVAL:
         last_moisture_check = current_time
         await m5_watering_unit.check_moisture_and_watering_status()
         m5_watering_unit.update_status()
@@ -166,7 +166,7 @@ async def handle_mqtt_publishing(sensor_data):
     global last_mqtt_publish
     current_time = utime.time()
     
-    if current_time - last_mqtt_publish >= PicoWConfig.MQTT_UPDATE_INTERVAL:
+    if current_time - last_mqtt_publish >= config_mgr.MQTT_UPDATE_INTERVAL:
         if not mqtt_mgr.is_connected:
             log_mgr.log("MQTT not connected, attempting to connect...")
             await mqtt_mgr.connect()
@@ -201,8 +201,7 @@ async def handle_mqtt_publishing(sensor_data):
                 log_mgr.log(f"MQTT publishing error: {e}")
         else:
             log_mgr.log("MQTT connection failed, skipping publish")
-
-
+            
 async def startup():
     display_task = None
     try:
@@ -232,6 +231,9 @@ async def startup():
             
             
         enviro_plus.on_display_mode_change = on_display_mode_change
+        mqtt_mgr.set_m5_watering_unit(m5_watering_unit)
+        
+        uasyncio.create_task(mqtt_mgr.run())
         
         uasyncio.create_task(system_mgr.run())
         influxdb_task = uasyncio.create_task(influx_data_manager.query_task())
@@ -247,11 +249,12 @@ async def startup():
                 m5_watering_unit.set_last_watered_time(last_watered)
         except uasyncio.TimeoutError:
             log_mgr.log("InfluxDB query timed out")
+            
         
         # Allow some time for final logs to be displayed
         await uasyncio.sleep(2)
         
-        enviro_plus.set_display_mode(PicoWConfig.DEFAULT_DISPLAY_MODE)
+        enviro_plus.set_display_mode(config_mgr.DEFAULT_DISPLAY_MODE)
     except RuntimeError as e:
         log_mgr.log(f"WiFi connection error: {e}")
     except Exception as e:
