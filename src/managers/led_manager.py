@@ -15,7 +15,8 @@ class LEDManager:
         self.timer.deinit()  # Stop any existing timer
         
         if status == "RUNNING":
-            self.timer.init(period=50, mode=Timer.PERIODIC, callback=self._pulse_green)
+            self.led.set_rgb(0, 0, 0)
+            # self.timer.init(period=50, mode=Timer.PERIODIC, callback=self._pulse_green)
         elif status == "PROCESSING":
             self.timer.init(period=50, mode=Timer.PERIODIC, callback=self._pulse_blue)
         elif status == "ERROR":
