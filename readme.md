@@ -2,68 +2,39 @@
 
 ## Project Overview
 
-PicoW-Growmat is an advanced plant monitoring and watering system using a Raspberry Pi Pico W with MicroPython. It integrates various sensors and components to create a comprehensive solution for plant care, environmental monitoring, and automated watering.
+PicoW-Growmat is a sophisticated plant monitoring and automated watering system designed for use in real growhouse environments. Built on the Raspberry Pi Pico W platform and utilizing MicroPython, this system integrates various sensors and components to provide comprehensive plant care, environmental monitoring, and intelligent watering control.
 
 ### Key Features
 
-- Automated plant watering based on soil moisture levels
-- Dual moisture sensing with M5 Watering Unit and DFRobot Capacitive Soil Moisture Sensor
-- Environmental monitoring (temperature, humidity, pressure, light, gas, sound)
+- Automated plant watering based on real-time soil moisture levels
+- Environmental monitoring (temperature, humidity, pressure, light, UV, gas, sound)
 - MQTT integration for remote monitoring and control
-- InfluxDB integration for data storage and retrieval
-- Display interface for real-time data visualization
-- Configurable settings for easy customization
-- Manual control with external momentary button
+- InfluxDB integration for long-term data storage and analysis
+- Interactive display interface with multiple information modes
+- Configurable settings for easy customization to different plant needs
+- Manual control options with both on-board and external buttons
+- Robust error handling and system health monitoring
 
-## Hardware Requirements
+## Hardware Components
 
 - Raspberry Pi Pico W
 - M5-Stack Watering Unit
 - Pimoroni Pico Enviro+ pHAT
 - LTR-390 UV and Ambient Light Sensor
-- Momentary button for manual control
+- External momentary button for manual control
 
 ## Software Requirements
 
 - MicroPython firmware for Raspberry Pi Pico W (picow-v1.23.0-1-pimoroni-micropython.uf2)
-- Required MicroPython libraries (included in the project)
-
-## Project Structure
-
-```
-.
-├── readme.md
-└── src
-    ├── components
-    │   ├── af_ltr390.py
-    │   ├── m5_watering_unit.py
-    │   ├── momentary_button.py
-    │   ├── pp_enviro_plus.py
-    │   └── water_tank.py
-    ├── config.json
-    ├── config.json.template
-    ├── config.py
-    ├── lib
-    │   └── umqtt_simple.py
-    ├── main.py
-    └── managers
-        ├── data_manager.py
-        ├── influx_data_manager.py
-        ├── led_manager.py
-        ├── log_manager.py
-        ├── mqtt_manager.py
-        ├── pp_enviro_plus_display_mgr.py
-        ├── system_manager.py
-        └── wifi_manager.py
-```
+- Custom PicoW-Growmat software (included in this repository)
 
 ## Setup Instructions
 
-1. Flash the Raspberry Pi Pico W with the provided MicroPython firmware (`picow-v1.23.0-1-pimoroni-micropython.uf2`).
+1. Flash the Raspberry Pi Pico W with the specified MicroPython firmware.
 2. Clone this repository to your local machine.
 3. Copy `config.json.template` to `config.json` and update with your specific settings:
 
-   ```shell
+   ``` powershell
    cp config.json.template config.json
    ```
 
@@ -72,62 +43,60 @@ PicoW-Growmat is an advanced plant monitoring and watering system using a Raspbe
 
 ## Configuration
 
-The system is configured using the `config.json` file. Key configuration sections include:
+The `config.json` file is the central configuration point for PicoW-Growmat. Key configuration sections include:
 
-- Wi-Fi Settings
-- MQTT Settings
-- InfluxDB Settings
-- Watering Unit Settings (M5 and DFRobot)
-- Enviro+ Settings
-- Light Schedule Settings
-- System Settings
+- Network settings (Wi-Fi, MQTT, InfluxDB)
+- Watering control parameters
+- Environmental thresholds
+- Display and LED settings
+- System update intervals
 
-Refer to the `config.json.template` file for a complete list of configuration options.
+Refer to `config.json.template` for a complete list of configurable options.
 
 ## Usage
 
-Once configured and powered on, the system will:
+Once powered on and configured, PicoW-Growmat will:
 
-1. Connect to Wi-Fi
+1. Establish network connections (Wi-Fi, MQTT, InfluxDB)
 2. Initialize all sensors and components
-3. Start monitoring soil moisture and environmental conditions
-4. Water the plant when soil moisture falls below the threshold
-5. Send data to the MQTT broker and InfluxDB at regular intervals
-6. Display current readings on the Enviro+ screen
+3. Begin continuous monitoring of soil moisture and environmental conditions
+4. Automatically water plants based on moisture thresholds
+5. Transmit data to MQTT and InfluxDB at configured intervals
+6. Display real-time information on the Enviro+ screen
 
-You can interact with the system using the buttons on the Enviro+ pHAT:
+### User Interaction
 
-- Button A: Toggle display backlight
-- Button B: Trigger sensor update or reset water tank (mode-dependent)
-- Button X: Cycle through display modes
-- Button Y: Trigger manual watering or update UV index (mode-dependent)
+- Enviro+ pHAT Buttons:
+  - A: Toggle display backlight
+  - B: Update sensors / Reset water tank (mode-dependent)
+  - X: Cycle through display modes
+  - Y: Manual watering / Update UV index (mode-dependent)
+- External button: Manual watering control
 
-The external momentary button can be used for manual watering control.
+### Display Modes
 
-## Display Modes
-
-1. Sensor Mode: Displays environmental data
-2. Watering Mode: Shows soil moisture and watering system status
-3. Log Mode: Displays recent system logs
-4. System Mode: Shows system performance metrics
+1. Sensor Mode: Environmental data overview
+2. Watering Mode: Soil moisture and watering system status
+3. Log Mode: Recent system events and notifications
+4. System Mode: Device performance and health metrics
 
 ## Troubleshooting
 
-- If the system fails to connect to Wi-Fi, check your `config.json` settings.
-- For MQTT or InfluxDB connection issues, verify your broker/database address and credentials.
-- If sensors are not reading correctly, check wiring and pin configurations.
-- Use the Log Mode on the display to view recent system events and errors.
+- Check `config.json` for correct network and sensor settings
+- Use Log Mode on the display to view recent system events and errors
+- Ensure all hardware connections are secure
+- Verify MQTT and InfluxDB server accessibility
 
 ## Contributing
 
-Contributions to this project are welcome! Please fork the repository and submit a pull request with your improvements.
+Contributions to PicoW-Growmat are welcome! Please fork the repository and submit a pull request with your improvements.
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+This project is open-source and available under the MIT License. See the LICENSE file for full details.
 
 ## Acknowledgments
 
-- Thanks to Pimoroni for the Enviro+ pHAT and libraries
-- Thanks to the MicroPython community for their excellent work
-- Thanks to the InfluxDB and MQTT communities for their robust data management solutions
+- Pimoroni for the Enviro+ pHAT and related libraries
+- The MicroPython community for their excellent work
+- InfluxDB and MQTT communities for robust data management solutions
