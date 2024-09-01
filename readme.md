@@ -9,9 +9,9 @@ PicoW-Growmat is a sophisticated plant monitoring and automated watering system 
 - Automated plant watering based on real-time soil moisture levels
 - Environmental monitoring (temperature, humidity, pressure, light, UV, gas, sound)
 - MQTT integration for remote monitoring and control
+- Configurable settings via MQTT for easy customization of configuration values and settings
 - InfluxDB integration for long-term data storage and analysis
 - Interactive display interface with multiple information modes
-- Configurable settings for easy customization to different plant needs
 - Manual control options with both on-board and external buttons
 - Robust error handling and system health monitoring
 
