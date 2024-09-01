@@ -103,7 +103,7 @@ class PicoEnviroPlusDisplayMgr:
 
     def reset_water_tank(self):
         self.enviro_plus.reset_water_tank_capacity()
-        self.enviro_plus.reset_water_used_unit_1()
+        self.enviro_plus.reset_water_used()
     
     def toggle_auto_watering(self):
         new_status = self.m5_watering_unit.toggle_auto_watering()
