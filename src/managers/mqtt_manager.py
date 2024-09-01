@@ -88,8 +88,8 @@ class MQTTManager:
     async def subscribe_to_control_topics(self):
         if self.is_connected:
             try:
-                self.client.subscribe(b"picow/control/#")
-                self.client.subscribe(b"picow/config/#")
+                self.client.subscribe(f"{self.config.MQTT_CLIENT_NAME}/control/#")
+                self.client.subscribe(f"{self.config.MQTT_CLIENT_NAME}/config/#")
                 self.log_mgr.log("MQTT control topics subscribed")
             except Exception as e:
                 self.log_mgr.log(f"Failed to subscribe to control topics: {e}")
@@ -114,10 +114,10 @@ class MQTTManager:
         msg = msg.decode('utf-8').strip()
         self.log_mgr.log(f"MQTT message received on topic {topic}: {msg}")
         
-        if topic.startswith("picow/config/"):
+        if topic.startswith(f"{self.config.MQTT_CLIENT_NAME}/config/"):
             _, _, key = topic.split('/')
             self.update_config(key, msg)
-        elif topic == "picow/control/watering":
+        elif topic == "picow-growmat/control/watering":
             uasyncio.create_task(self.handle_watering_control(msg))
 
     async def handle_watering_control(self, msg):

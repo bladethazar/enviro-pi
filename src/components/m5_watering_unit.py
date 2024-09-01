@@ -27,6 +27,7 @@ class M5WateringUnit:
         self.WATERING_PAUSE_DURATION = config.WATERING_PAUSE_DURATION
         
         # State variables
+        self.raw_moisture_value = self.moisture_sensor.read_u16()
         self.current_moisture = self.read_moisture()
         self.water_used = 0
         self.last_watered = 0
@@ -57,8 +58,7 @@ class M5WateringUnit:
 
     def read_moisture(self):
         try:
-            raw_value = self.moisture_sensor.read_u16()
-            self.log_manager.log(f"M5 moisture value: {raw_value}")
+            self.raw_moisture_value = self.moisture_sensor.read_u16()
             
             # Calculate moisture percentage
             moisture_range = self.MOISTURE_SENSOR_DRY_VALUE - self.MOISTURE_SENSOR_WET_VALUE
@@ -67,17 +67,17 @@ class M5WateringUnit:
                 return None
 
             # Correct calculation: 100% when raw_value is at or below WET_VALUE, 0% when at or above DRY_VALUE
-            if raw_value <= self.MOISTURE_SENSOR_WET_VALUE:
+            if self.raw_moisture_value <= self.MOISTURE_SENSOR_WET_VALUE:
                 moisture_percent = 100.0
-            elif raw_value >= self.MOISTURE_SENSOR_DRY_VALUE:
+            elif self.raw_moisture_value >= self.MOISTURE_SENSOR_DRY_VALUE:
                 moisture_percent = 0.0
             else:
-                moisture_percent = ((self.MOISTURE_SENSOR_DRY_VALUE - raw_value) / moisture_range) * 100
+                moisture_percent = ((self.MOISTURE_SENSOR_DRY_VALUE - self.raw_moisture_value) / moisture_range) * 100
 
             moisture_percent = max(0, min(100, moisture_percent))
             return moisture_percent
         except Exception as e:
-            self.log_manager.log(f"Error reading moisture(M5): {e}")
+            self.log_manager.log(f"Error reading moisture: {e}")
             return None
 
     async def control_pump(self, duration):
@@ -128,6 +128,7 @@ class M5WateringUnit:
     def get_current_data(self):
         with self.lock:
             return {
+                "raw_moisture_value": self.raw_moisture_value,
                 "moisture": round(self.current_moisture, 2) if self.current_moisture is not None else None,
                 "water_used": round(self.water_used, 2),
                 "water_left": round(self.water_tank.get_capacity(), 2),
