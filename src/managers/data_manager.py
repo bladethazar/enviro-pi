@@ -10,17 +10,17 @@ class DataManager:
         self.system_mgr = system_mgr
 
     def correct_temperature_reading(self, temperature):
-        return temperature - self.config.TEMPERATURE_OFFSET
+        return round(temperature - self.config.TEMPERATURE_OFFSET, 2)
 
     def correct_humidity_reading(self, humidity, temperature, corrected_temperature):
         dewpoint = temperature - ((100 - humidity) / 5)
         corrected_humidity = max(0, min(100, 100 - (5 * (corrected_temperature - dewpoint))))
-        return corrected_humidity
+        return round(corrected_humidity, 2)
 
     def adjust_to_sea_pressure(self, pressure, temperature, altitude):
         pressure_hpa = pressure / 100
         adjusted_hpa = pressure_hpa + ((pressure_hpa * 9.80665 * altitude) / (287 * (273 + temperature + (altitude / 400))))
-        return adjusted_hpa
+        return round(adjusted_hpa, 2)
     
     def adjust_lux_for_growhouse(self, lux):
         # Increase sensitivity for low light conditions
@@ -110,7 +110,15 @@ class DataManager:
 
     def prepare_mqtt_sensor_data_for_publishing(self, m5_watering_unit_data, enviro_plus_data, system_data):
         try:
-            mqtt_data = system_data  # Unpack the tuple, ignore the InfluxDB data
+            mqtt_data = system_data
+            # Convert last_watered to Europe/Berlin timezone
+            if 'last_watered' in m5_watering_unit_data:
+                    last_watered_time = utime.localtime(int(m5_watering_unit_data['last_watered']))
+                    formatted_time = "{:04d}-{:02d}-{:02d} {:02d}:{:02d}:{:02d}".format(
+                        last_watered_time[0], last_watered_time[1], last_watered_time[2],
+                        last_watered_time[3], last_watered_time[4], last_watered_time[5]
+                    )
+                    m5_watering_unit_data['last_watered'] = formatted_time
             data = {
                 "m5-watering-unit": m5_watering_unit_data,
                 "enviro-plus": enviro_plus_data,

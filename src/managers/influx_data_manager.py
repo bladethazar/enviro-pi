@@ -62,7 +62,7 @@ class InfluxDataManager:
     async def get_water_tank_level(self):
         query = f'''
         from(bucket:"{self.bucket}")
-          |> range(start: -100h)
+          |> range(start: -96h)
           |> filter(fn: (r) => r.entity_id == "water_tank_level")
           |> last()
         '''
@@ -80,7 +80,7 @@ class InfluxDataManager:
     async def get_last_watered_time(self):
         query = f'''
         from(bucket:"{self.bucket}")
-          |> range(start: -24h)
+          |> range(start: -96h)
           |> filter(fn: (r) => r.entity_id == "m5_last_watered")
           |> last()
         '''
