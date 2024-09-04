@@ -11,11 +11,10 @@ from adcfft import ADCFFT
 import gc
 
 class PicoEnviroPlus:
-    def __init__(self, config, log_manager, data_mgr, af_ltr390, reset_water_tank_capacity, m5_watering_unit):
+    def __init__(self, config, log_manager, data_mgr, reset_water_tank_capacity, m5_watering_unit):
         self.config = config
         self.log_manager = log_manager
         self.data_mgr = data_mgr
-        self.af_ltr390 = af_ltr390
         self.system_manager = None
         self.display_manager = None
         self.m5_watering_unit = m5_watering_unit
@@ -78,7 +77,6 @@ class PicoEnviroPlus:
         try:
             bme_data = self.bme.read()
             ltr559_data = self.ltr559.get_reading()
-            ltr390_data = self.af_ltr390.read_sensor()
             mic_reading = self.mic.read_u16()
 
             temperature = bme_data[0]
@@ -111,11 +109,7 @@ class PicoEnviroPlus:
                 "mic": mic_db,
                 "status": bme_data[4],
                 "env_status": env_status,
-                "env_issues": issues,
-                "af_uv": ltr390_data['uv'],
-                "af_uvi": ltr390_data['uvi'],
-                "af_ambient_light": ltr390_data['ambient_light'],
-                "af_lux": ltr390_data['lux']
+                "env_issues": issues
             }
             self.last_sensor_read = utime.ticks_ms()
             return self.sensor_data

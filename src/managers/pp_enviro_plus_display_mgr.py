@@ -115,10 +115,12 @@ class PicoEnviroPlusDisplayMgr:
 
     def read_all_sensors(self):
         self.log_mgr.log("Reading all sensors")
+        self.log_mgr.log("Not implemented yet")
         # Implement sensor reading logic
 
     def update_uv_index(self):
         self.log_mgr.log("Updating UV Index")
+        self.log_mgr.log("Not implemented yet")
         # Implement UV Index update logic
 
     def clear_system_memory(self):
@@ -223,34 +225,35 @@ class PicoEnviroPlusDisplayMgr:
         # Other sensor data
         y_offset += 35
         self.display.set_pen(self.WHITE)
-        self.display.text(f"HUM: {sensor_data['humidity']:.1f}%", left_column, y_offset, scale=2)
-        self.display.text(f"AIR-P: {sensor_data['pressure']:.0f} hPa", right_column, y_offset, scale=2)
+        self.display.text(f"HUM:", left_column, y_offset, scale=2)
+        self.display.text(f"{sensor_data['humidity']:.1f}%", right_column, y_offset, scale=2)
+
+        y_offset += 20
+        self.display.text(f"AIR P:", left_column, y_offset, scale=2)
+        self.display.text(f"{sensor_data['pressure']:.0f} hPa", right_column, y_offset, scale=2)
+        
+        y_offset += 20
+        self.display.text(f"AIR Q:", left_column, y_offset, scale=2)
+        self.display.text(f"{sensor_data['gas_quality']}", right_column, y_offset, scale=2)
         
         y_offset += 20
         light_status = sensor_data.get('light_status', 'N/A')
-        self.display.text(f"LUX-O: {sensor_data['lux']:.0f}", left_column, y_offset, scale=2)
-        self.display.text(f"({light_status})", right_column, y_offset, scale=2)
-        
-        y_offset += 20
-        self.display.text(f"LUX-I: {sensor_data['af_lux']:.1f}", left_column, y_offset, scale=2)
-        self.display.text(f"A-Light: {sensor_data['af_ambient_light']:.0f}", right_column, y_offset, scale=2)
-        y_offset += 20
-        self.display.text(f"UV: {sensor_data['af_uv']:.0f}", left_column, y_offset, scale=2)
-        self.display.text(f"UVI: {sensor_data['af_uvi']:.1f}", right_column, y_offset, scale=2)
-        
-        
-        y_offset += 20
-        self.display.text(f"Air Quality: {sensor_data['gas_quality']}", left_column, y_offset, scale=2)
+        self.display.text(f"LUX:", left_column, y_offset, scale=2)
+        self.display.text(f"{sensor_data['lux']:.0f} [{light_status}]", right_column, y_offset, scale=2)
         
         y_offset += 20
         if 'mic' in sensor_data:
+            text = 'SOUND:'
             mic_value = sensor_data['mic']
             if isinstance(mic_value, (int, float)):
-                self.display.text(f"Sound: {mic_value:.1f} dB", left_column, y_offset, scale=2)
+                self.display.text(f"{text}", left_column, y_offset, scale=2)
+                self.display.text(f"{mic_value:.1f} dB", right_column, y_offset, scale=2)
             else:
-                self.display.text("Sound: N/A", left_column, y_offset, scale=2)
+                self.display.text(f"{text}", left_column, y_offset, scale=2)
+                self.display.text("N/A", right_column, y_offset, scale=2)
         else:
-            self.display.text("Sound: N/A", left_column, y_offset, scale=2)
+            self.display.text(f"{text} N/A", left_column, y_offset, scale=2)
+            self.display.text("N/A", right_column, y_offset, scale=2)
 
         self.draw_button_labels()
         self.display.update()

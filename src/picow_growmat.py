@@ -18,7 +18,6 @@ from components.m5_watering_unit import M5WateringUnit
 from components.pp_enviro_plus import PicoEnviroPlus
 from components.water_tank import WaterTank
 from components.momentary_button import MomentaryButton 
-from components.af_ltr390 import AFLTR390 
 
 class PicoWGrowmat:
     def __init__(self):
@@ -35,8 +34,7 @@ class PicoWGrowmat:
 
         self.water_tank = WaterTank(self.config_mgr.WATER_TANK_FULL_CAPACITY, self.log_mgr)
         self.m5_watering_unit = M5WateringUnit(self.config_mgr, self.system_mgr, self.log_mgr, self.water_tank)
-        self.af_ltr390 = AFLTR390()
-        self.enviro_plus = PicoEnviroPlus(self.config_mgr, self.log_mgr, self.data_mgr, self.af_ltr390, self.water_tank.reset_capacity, self.m5_watering_unit)
+        self.enviro_plus = PicoEnviroPlus(self.config_mgr, self.log_mgr, self.data_mgr, self.water_tank.reset_capacity, self.m5_watering_unit)
         self.enviro_plus_led = self.enviro_plus.get_led()
         self.external_watering_button = MomentaryButton(self.config_mgr.MOMENTARY_BUTTON_PIN)
 
