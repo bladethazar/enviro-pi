@@ -274,7 +274,7 @@ class PicoEnviroPlusDisplayMgr:
             return f"{time_diff // 86400} days ago"
         
 
-    async def update_watering_display(self, watering_unit_data):
+    async def update_watering_display(self, watering_unit_data, dfr_moisture_sensor_data):
         self.draw_display_mode_title("H²O")
         
         # Water tank capacity bar graph
@@ -299,7 +299,7 @@ class PicoEnviroPlusDisplayMgr:
         self.display.text(f"Moisture", x_offset, y_offset, scale=2)
         y_offset += 20
         
-        self.display.text(f"M5: {watering_unit_data['moisture']:.1f}%", x_offset, y_offset, scale=2)
+        self.display.text(f"M5: {watering_unit_data['moisture']:.1f}% | DFR: {dfr_moisture_sensor_data['moisture_percent']:.1f}%", x_offset, y_offset, scale=2)
         y_offset += 25
         
         self.display.line(25, y_offset - 10, self.DISPLAY_WIDTH, y_offset - 10, 1)

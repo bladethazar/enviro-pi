@@ -108,7 +108,7 @@ class DataManager:
 
         return env_status, issues, light_status
 
-    def prepare_mqtt_sensor_data_for_publishing(self, m5_watering_unit_data, enviro_plus_data, system_data):
+    def prepare_mqtt_sensor_data_for_publishing(self, m5_watering_unit_data, dfr_moisture_sensor_data, enviro_plus_data, system_data):
         try:
             mqtt_data = system_data
             # Convert last_watered to Europe/Berlin timezone
@@ -121,6 +121,7 @@ class DataManager:
                     m5_watering_unit_data['last_watered'] = formatted_time
             data = {
                 "m5-watering-unit": m5_watering_unit_data,
+                "dfr-moisture-sensor": dfr_moisture_sensor_data,
                 "enviro-plus": enviro_plus_data,
                 "system": mqtt_data["system"],
                 "adc": mqtt_data["adc"]

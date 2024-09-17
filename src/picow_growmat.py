@@ -18,6 +18,7 @@ from components.m5_watering_unit import M5WateringUnit
 from components.pp_enviro_plus import PicoEnviroPlus
 from components.water_tank import WaterTank
 from components.momentary_button import MomentaryButton 
+from components.dfr_moisture_sensor import DFRobotMoistureSensor
 
 class PicoWGrowmat:
     def __init__(self):
@@ -34,6 +35,7 @@ class PicoWGrowmat:
 
         self.water_tank = WaterTank(self.config_mgr.WATER_TANK_FULL_CAPACITY, self.log_mgr)
         self.m5_watering_unit = M5WateringUnit(self.config_mgr, self.system_mgr, self.log_mgr, self.water_tank)
+        self.dfr_moisture_sensor = DFRobotMoistureSensor(self.config_mgr, self.log_mgr)
         self.enviro_plus = PicoEnviroPlus(self.config_mgr, self.log_mgr, self.data_mgr, self.water_tank.reset_capacity, self.m5_watering_unit)
         self.enviro_plus_led = self.enviro_plus.get_led()
         self.external_watering_button = MomentaryButton(self.config_mgr.MOMENTARY_BUTTON_PIN)
@@ -157,6 +159,7 @@ class PicoWGrowmat:
             self.last_moisture_check = current_time
             await self.m5_watering_unit.check_moisture_and_watering_status()
             self.m5_watering_unit.update_status()
+            await self.dfr_moisture_sensor.check_moisture()
 
     async def update_display(self, sensor_data):
         if sensor_data is None:
@@ -168,8 +171,9 @@ class PicoWGrowmat:
                 await self.enviro_plus_display_mgr.update_sensor_display(sensor_data)
             elif display_mode == "Watering":
                 watering_unit_data = self.m5_watering_unit.get_current_data()
-                if watering_unit_data:
-                    await self.enviro_plus_display_mgr.update_watering_display(watering_unit_data)
+                dfr_moisture_sensor_data = self.dfr_moisture_sensor.get_moisture_data()
+                if watering_unit_data and dfr_moisture_sensor_data:
+                    await self.enviro_plus_display_mgr.update_watering_display(watering_unit_data, dfr_moisture_sensor_data)
             elif display_mode == "Log":
                 await self.enviro_plus_display_mgr.update_log_display()
             elif display_mode == "System":
@@ -190,6 +194,7 @@ class PicoWGrowmat:
                 try:
                     prepared_mqtt_data = self.data_mgr.prepare_mqtt_sensor_data_for_publishing(
                         self.m5_watering_unit.get_current_data(),
+                        self.dfr_moisture_sensor.get_moisture_data(),
                         sensor_data,
                         self.system_mgr.get_system_data()
                     )
