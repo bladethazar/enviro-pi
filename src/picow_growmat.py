@@ -90,6 +90,7 @@ class PicoWGrowmat:
     async def _setup_components(self):
         self.enviro_plus.on_display_mode_change = self.on_display_mode_change
         self.mqtt_mgr.set_m5_watering_unit(self.m5_watering_unit)
+        self.mqtt_mgr.set_dfr_moisture_sensor(self.dfr_moisture_sensor)
         self.enviro_plus_display_mgr.setup_display(self.config_mgr)
 
     async def _start_tasks(self):
@@ -196,7 +197,8 @@ class PicoWGrowmat:
                         self.m5_watering_unit.get_current_data(),
                         self.dfr_moisture_sensor.get_moisture_data(),
                         sensor_data,
-                        self.system_mgr.get_system_data()
+                        self.system_mgr.get_system_data(),
+                        self.system_mgr.get_current_config_data()
                     )
                     publish_result = await self.mqtt_mgr.publish_data(prepared_mqtt_data)
                     if publish_result:
