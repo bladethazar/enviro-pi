@@ -42,8 +42,8 @@ class DataManager:
     
     def interpret_mic_reading(self, mic):
         # Define the range of the microphone input
-        MIC_MIN = 33000  # Adjusted based on your silent readings
-        MIC_MAX = 65535  # Assuming 16-bit ADC
+        MIC_MIN = self.config.MIC_MIN_VALUE  # Adjusted based on your silent readings
+        MIC_MAX = self.config.MIC_MAX_VALUE  # Assuming 16-bit ADC
 
         # Define the desired dB range
         DB_MIN = 10  # Lowest reading (very quiet room)
@@ -108,7 +108,7 @@ class DataManager:
 
         return env_status, issues, light_status
 
-    def prepare_mqtt_sensor_data_for_publishing(self, m5_watering_unit_data, dfr_moisture_sensor_data, enviro_plus_data, system_data):
+    def prepare_mqtt_sensor_data_for_publishing(self, m5_watering_unit_data, dfr_moisture_sensor_data, enviro_plus_data, system_data, current_config_data):
         try:
             mqtt_data = system_data
             # Convert last_watered to Europe/Berlin timezone
@@ -124,7 +124,8 @@ class DataManager:
                 "dfr-moisture-sensor": dfr_moisture_sensor_data,
                 "enviro-plus": enviro_plus_data,
                 "system": mqtt_data["system"],
-                "adc": mqtt_data["adc"]
+                "adc": mqtt_data["adc"],
+                "current_config": current_config_data
             }
             return data
         except Exception as e:

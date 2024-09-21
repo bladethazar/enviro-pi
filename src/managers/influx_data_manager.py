@@ -10,6 +10,7 @@ class InfluxDataManager:
         self.org = config.INFLUXDB_ORG
         self.bucket = config.INFLUXDB_BUCKET
         self.token = config.INFLUXDB_TOKEN
+        self.lookup_interval_in_days = 30
 
     async def _query_influxdb(self, query):
         url = f"{self.base_url}/query?org={self.org}"
@@ -62,7 +63,7 @@ class InfluxDataManager:
     async def get_water_tank_level(self):
         query = f'''
         from(bucket:"{self.bucket}")
-          |> range(start: -96h)
+          |> range(start: -{self.lookup_interval_in_days}d)
           |> filter(fn: (r) => r.entity_id == "water_tank_level")
           |> last()
         '''
@@ -80,8 +81,8 @@ class InfluxDataManager:
     async def get_last_watered_time(self):
         query = f'''
         from(bucket:"{self.bucket}")
-          |> range(start: -96h)
-          |> filter(fn: (r) => r.entity_id == "m5_last_watered")
+          |> range(start: -{self.lookup_interval_in_days}d)
+          |> filter(fn: (r) => r["friendly_name"] == "M5 Unit Last Watered")
           |> last()
         '''
         result = await self._query_influxdb(query)
@@ -108,7 +109,7 @@ class InfluxDataManager:
             if last_watered is not None:
                 try:
                     last_watered_time = utime.localtime(int(last_watered))
-                    self.log_manager.log(f"Last watered time: {last_watered_time}")
+                    self.log_manager.log(f"M5 Watering Unit last watered: {last_watered_time}")
                 except ValueError:
                     self.log_manager.log(f"Error converting last watered time: {last_watered}")
             else:
