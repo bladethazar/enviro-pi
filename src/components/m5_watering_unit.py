@@ -166,7 +166,7 @@ class M5WateringUnit:
 
     async def trigger_watering(self):
         if not self.is_watering:
-            self.log_manager.log(f"Manual watering triggered for {self.WATERING_DURATION} seconds.")
+            self.log_manager.log(f"Watering triggered for {self.WATERING_DURATION} seconds.")
             await self.control_pump(self.WATERING_DURATION)
             self.cleanup()
         else:
