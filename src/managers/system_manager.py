@@ -266,6 +266,7 @@ class SystemManager:
             "light_schedule_start_hour": self.config.LIGHT_SCHEDULE_START_HOUR,
             "light_schedule_end_hour": self.config.LIGHT_SCHEDULE_END_HOUR,
             "temperature_offset": self.config.TEMPERATURE_OFFSET,
+            "humidity_offset": self.config.HUMIDITY_OFFSET,
             "enviro_plus_display_brightness": self.config.ENVIRO_PLUS_DISPLAY_BRIGHTNESS,
             "mic_min_value": self.config.MIC_MIN_VALUE,
             "mic_max_value": self.config.MIC_MAX_VALUE,

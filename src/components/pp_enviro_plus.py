@@ -85,8 +85,6 @@ class PicoEnviroPlus:
             gas = bme_data[3]
             enviro_plus_lux = ltr559_data[BreakoutLTR559.LUX] if ltr559_data else 0
             
-            
-
             corrected_temperature = self.data_mgr.correct_temperature_reading(temperature)
             self.set_temperature_edge_values(corrected_temperature)
             corrected_humidity = self.data_mgr.correct_humidity_reading(humidity, temperature, corrected_temperature)

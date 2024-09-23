@@ -15,7 +15,7 @@ class DataManager:
     def correct_humidity_reading(self, humidity, temperature, corrected_temperature):
         dewpoint = temperature - ((100 - humidity) / 5)
         corrected_humidity = max(0, min(100, 100 - (5 * (corrected_temperature - dewpoint))))
-        return round(corrected_humidity, 2)
+        return round(corrected_humidity - self.config.HUMIDITY_OFFSET, 2)
 
     def adjust_to_sea_pressure(self, pressure, temperature, altitude):
         pressure_hpa = pressure / 100
