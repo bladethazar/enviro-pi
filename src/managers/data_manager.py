@@ -8,6 +8,8 @@ class DataManager:
         self.config = config
         self.log_manager = log_mgr
         self.system_mgr = system_mgr
+        self.moving_averages = {}
+        self.window_size = self.config.SENSOR_DATA_AVG_WINDOW_SIZE
 
     def correct_temperature_reading(self, temperature):
         return round(temperature - self.config.TEMPERATURE_OFFSET, 2)
@@ -50,12 +52,12 @@ class DataManager:
         DB_MAX = 110  # Highest reading (very loud)
 
         # Normalize the mic reading to a 0-1 range
-        normalized = max(0, min(1, (mic - MIC_MIN) / (MIC_MAX - MIC_MIN)))
+        normalized_mic = max(0, min(1, (self.filter_spike("mic", mic) - MIC_MIN) / (MIC_MAX - MIC_MIN)))
 
         # Convert to logarithmic dB scale
         # Using a modified formula to give more realistic values
-        if normalized > 0:
-            db_value = DB_MIN + (DB_MAX - DB_MIN) * (math.log10(1 + 9 * normalized) / math.log10(10))
+        if normalized_mic > 0:
+            db_value = DB_MIN + (DB_MAX - DB_MIN) * (math.log10(1 + 9 * normalized_mic) / math.log10(10))
         else:
             db_value = DB_MIN
 
@@ -107,13 +109,42 @@ class DataManager:
             light_status = "Night time"
 
         return env_status, issues, light_status
+    
+
+    def filter_spike(self, sensor_name, value):
+        if sensor_name not in self.moving_averages:
+            self.moving_averages[sensor_name] = []
+
+        history = self.moving_averages[sensor_name]
+        
+        if len(history) < self.window_size:
+            history.append(value)
+            return value
+        
+        avg = sum(history) / len(history)
+        deviation = abs(value - avg)
+        
+        # Define threshold as a percentage of the average
+        threshold = 0.5 * avg  # 50% deviation threshold, adjust as needed
+        
+        if deviation > threshold:
+            self.log_manager.log(f"Spike detected in {sensor_name}: {value}. Using average: {avg}")
+            filtered_value = avg
+        else:
+            filtered_value = value
+        
+        history.append(filtered_value)
+        if len(history) > self.window_size:
+            history.pop(0)
+        
+        return filtered_value
 
     def prepare_mqtt_sensor_data_for_publishing(self, m5_watering_unit_data, dfr_moisture_sensor_data, enviro_plus_data, system_data, current_config_data):
         try:
             mqtt_data = system_data
             # Convert last_watered to Europe/Berlin timezone
             if 'last_watered' in m5_watering_unit_data:
-                    last_watered_time = utime.localtime(int(m5_watering_unit_data['last_watered']))
+                    last_watered_time = utime.localtime(int(m5_watering_unit_data['last_watered']) + (self.config.DST_HOURS * 3600))
                     formatted_time = "{:04d}-{:02d}-{:02d} {:02d}:{:02d}:{:02d}".format(
                         last_watered_time[0], last_watered_time[1], last_watered_time[2],
                         last_watered_time[3], last_watered_time[4], last_watered_time[5]
