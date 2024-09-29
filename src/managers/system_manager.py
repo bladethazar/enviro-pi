@@ -176,6 +176,7 @@ class SystemManager:
             temp_sensor = machine.ADC(4)
             reading = temp_sensor.read_u16() * (3.3 / 65535)
             temperature = 27 - (reading - 0.706) / 0.001721
+            temperature = self.data_mgr.filter_spike("chip_temperature", temperature)
             return machine.ADC(29).read_u16() * (3.3 / 65535), temperature
         except Exception as e:
             self.log_mgr.log(f"Error reading system data: {e}")

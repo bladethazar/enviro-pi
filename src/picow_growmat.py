@@ -38,7 +38,7 @@ class PicoWGrowmat:
         self.dfr_moisture_sensor = DFRobotMoistureSensor(self.config_mgr, self.log_mgr)
         self.enviro_plus = PicoEnviroPlus(self.config_mgr, self.log_mgr, self.data_mgr, self.water_tank.reset_capacity, self.m5_watering_unit)
         self.enviro_plus_led = self.enviro_plus.get_led()
-        self.external_watering_button = MomentaryButton(self.config_mgr.MOMENTARY_BUTTON_PIN)
+        self.external_watering_button = MomentaryButton(self.config_mgr.MOMENTARY_BUTTON_PIN, sample_size=10, threshold=8)
 
         self.system_mgr.set_led(self.enviro_plus_led)
         self.enviro_plus_display_mgr = PicoEnviroPlusDisplayMgr(self.config_mgr, self.enviro_plus, self.log_mgr, self.data_mgr, self.m5_watering_unit, self.system_mgr)
@@ -116,7 +116,6 @@ class PicoWGrowmat:
                 
                 await self.handle_external_watering_button()
                 await self.process_sensor_data()
-                await self.handle_watering()
                 
                 self.enviro_plus.check_buttons()
                 await uasyncio.sleep(1)
@@ -153,14 +152,6 @@ class PicoWGrowmat:
 
     async def read_enviro_plus_sensors(self):
         return self.enviro_plus.get_sensor_data()
-
-    async def handle_watering(self):
-        current_time = utime.time()
-        if current_time - self.last_moisture_check >= self.config_mgr.MOISTURE_CHECK_INTERVAL:
-            self.last_moisture_check = current_time
-            await self.m5_watering_unit.check_moisture_and_watering_status()
-            self.m5_watering_unit.update_status()
-            await self.dfr_moisture_sensor.check_moisture()
 
     async def update_display(self, sensor_data):
         if sensor_data is None:

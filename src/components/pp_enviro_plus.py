@@ -21,7 +21,6 @@ class PicoEnviroPlus:
         self.reset_water_tank_capacity = reset_water_tank_capacity
         self.trigger_watering = self.m5_watering_unit.trigger_watering
         self.reset_water_used = self.m5_watering_unit.reset_water_used
-        self.toggle_auto_watering = self.m5_watering_unit.toggle_auto_watering
 
         # Initialize display
         self.display = PicoGraphics(display=DISPLAY_ENVIRO_PLUS, rotate=90)

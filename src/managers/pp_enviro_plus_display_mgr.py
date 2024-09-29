@@ -46,7 +46,7 @@ class PicoEnviroPlusDisplayMgr:
                 "Y": (self.update_uv_index, "UV-Index")
             },
             "Watering": {
-                "A": (self.toggle_auto_watering, "Auto: On/Off"),
+                "A": (self.cycle_display_mode, "Previous"),
                 "B": (self.reset_water_tank, "Reset tank"),
                 "X": (self.cycle_display_mode, "Next"),
                 "Y": (self.trigger_watering, "Water Now")
@@ -105,10 +105,6 @@ class PicoEnviroPlusDisplayMgr:
         self.enviro_plus.reset_water_tank_capacity()
         self.enviro_plus.reset_water_used()
     
-    def toggle_auto_watering(self):
-        new_status = self.m5_watering_unit.toggle_auto_watering()
-        self.log_mgr.log(f"Auto watering {'enabled' if new_status else 'disabled'}")
-
     async def trigger_watering(self):
         self.log_mgr.log("Manual watering triggered")
         await self.m5_watering_unit.trigger_watering()
@@ -299,17 +295,14 @@ class PicoEnviroPlusDisplayMgr:
         self.display.text(f"Moisture", x_offset, y_offset, scale=2)
         y_offset += 20
         
-        self.display.text(f"M5: {watering_unit_data['moisture']:.1f}% | DFR: {dfr_moisture_sensor_data['moisture_percent']:.1f}%", x_offset, y_offset, scale=2)
+        self.display.text(f"M5: {watering_unit_data['moisture']:.1f}%", x_offset, y_offset, scale=2)
+        y_offset += 25
+        self.display.text(f"DFR: {dfr_moisture_sensor_data['moisture_percent']:.1f}%", x_offset, y_offset, scale=2)
         y_offset += 25
         
         self.display.line(25, y_offset - 10, self.DISPLAY_WIDTH, y_offset - 10, 1)
         
         self.display.set_pen(self.CYAN)
-        auto_status = "ON" if watering_unit_data['auto_watering'] else "OFF"
-        self.display.text(f"Auto watering: {auto_status}", x_offset, y_offset, scale=2)
-        y_offset += 25
-        
-
         
         self.display.text(f"Last watered:", x_offset, y_offset, scale=2)
         y_offset += 20
@@ -325,7 +318,6 @@ class PicoEnviroPlusDisplayMgr:
         self.display.text(f"-> {watering_unit_data['water_left']:.0f}ml ({percentage:.0f}%)", x_offset, y_offset, scale=2)
         y_offset += 25
         
-        self.display.text(f"Auto-Cycles: {watering_unit_data['watering_cycles']}/{watering_unit_data['watering_cycles_configured']}", x_offset, y_offset, scale=2)
         
         self.draw_button_labels()
         self.display.update()
