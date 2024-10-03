@@ -126,15 +126,26 @@ class PicoWGrowmat:
                 await uasyncio.sleep(5)
 
     async def process_sensor_data(self):
-        sensor_data = await self.read_enviro_plus_sensors()
-        if sensor_data is None:
-            self.log_mgr.log("No sensor data available, skipping this iteration")
-            return
-
-        await self.update_display(sensor_data)
+        # Enviro Plus Sensor
+        enviro_plus_sensor_data = await self.read_enviro_plus_sensors()
+        # DFR Moisture Sensor
+        await self.dfr_moisture_sensor.read_moisture()
+        dfr_moisture_sensor_data = self.dfr_moisture_sensor.get_moisture_data()
+        # M5 Watering Unit
+        await self.m5_watering_unit.read_moisture()
+        m5_watering_unit_data = self.m5_watering_unit.get_current_data()
         
-        if sensor_data.get('status', 0) & STATUS_HEATER_STABLE:
-            await self.handle_mqtt_publishing(sensor_data)
+        if enviro_plus_sensor_data is None or dfr_moisture_sensor_data is None or m5_watering_unit_data is None:
+            self.log_mgr.log("No Enviro Plus sensor data available")
+        elif dfr_moisture_sensor_data is None:
+            self.log_mgr.log("No DFR Moisture sensor data available")
+        elif m5_watering_unit_data is None:
+            self.log_mgr.log("No M5 Watering data available")
+
+        await self.update_display(enviro_plus_sensor_data, dfr_moisture_sensor_data, m5_watering_unit_data)
+        
+        if enviro_plus_sensor_data.get('status', 0) & STATUS_HEATER_STABLE:
+            await self.handle_mqtt_publishing(enviro_plus_sensor_data, dfr_moisture_sensor_data, m5_watering_unit_data)
         else:
             self.log_mgr.log("Gas sensor heater not stable, skipping MQTT publishing")
 
@@ -153,7 +164,7 @@ class PicoWGrowmat:
     async def read_enviro_plus_sensors(self):
         return self.enviro_plus.get_sensor_data()
 
-    async def update_display(self, sensor_data):
+    async def update_display(self, sensor_data, dfr_moisture_sensor_data, m5_watering_unit_data):
         if sensor_data is None:
             return
         
@@ -162,10 +173,8 @@ class PicoWGrowmat:
             if display_mode == "Sensor":
                 await self.enviro_plus_display_mgr.update_sensor_display(sensor_data)
             elif display_mode == "Watering":
-                watering_unit_data = self.m5_watering_unit.get_current_data()
-                dfr_moisture_sensor_data = self.dfr_moisture_sensor.get_moisture_data()
-                if watering_unit_data and dfr_moisture_sensor_data:
-                    await self.enviro_plus_display_mgr.update_watering_display(watering_unit_data, dfr_moisture_sensor_data)
+                if m5_watering_unit_data and dfr_moisture_sensor_data:
+                    await self.enviro_plus_display_mgr.update_watering_display(m5_watering_unit_data, dfr_moisture_sensor_data)
             elif display_mode == "Log":
                 await self.enviro_plus_display_mgr.update_log_display()
             elif display_mode == "System":
@@ -174,9 +183,8 @@ class PicoWGrowmat:
         except Exception as e:
             self.log_mgr.log(f"Error updating display: {e}")
 
-    async def handle_mqtt_publishing(self, sensor_data):
+    async def handle_mqtt_publishing(self, enviro_plus_sensor_data, dfr_moisture_sensor_data, m5_watering_unit_data):
         current_time = utime.time()
-        
         if current_time - self.last_mqtt_publish >= self.config_mgr.MQTT_UPDATE_INTERVAL:
             if not self.mqtt_mgr.is_connected:
                 self.log_mgr.log("MQTT not connected, attempting to connect...")
@@ -185,9 +193,9 @@ class PicoWGrowmat:
             if self.mqtt_mgr.is_connected:
                 try:
                     prepared_mqtt_data = self.data_mgr.prepare_mqtt_sensor_data_for_publishing(
-                        self.m5_watering_unit.get_current_data(),
-                        self.dfr_moisture_sensor.get_moisture_data(),
-                        sensor_data,
+                        m5_watering_unit_data,
+                        dfr_moisture_sensor_data,
+                        enviro_plus_sensor_data,
                         self.system_mgr.get_system_data(),
                         self.system_mgr.get_current_config_data()
                     )

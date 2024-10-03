@@ -19,8 +19,8 @@ class PicoEnviroPlusDisplayMgr:
         self.setup_colors()
         
         self.display_backlight_on = True
-        self.display_modes = ["Watering", "Sensor", "System", "Log"]
-        self.current_mode_index = 1  # Start with Watering mode
+        self.display_modes = ["Sensor", "Watering", "System", "Log"]
+        self.current_mode_index = 0  # Start with Watering mode
         self.enviro_plus.display_mode = self.display_modes[self.current_mode_index]
         
         # Log settings
@@ -254,25 +254,9 @@ class PicoEnviroPlusDisplayMgr:
         self.draw_button_labels()
         self.display.update()
         
-    
-    def calculate_time_since_last_watered(self, last_watered):
-        if int(last_watered) == 0:
-            return "Never"
-        
-        time_diff = utime.time() - int(last_watered)
-        if time_diff < 60:
-            return f"{time_diff} sec ago"
-        elif time_diff < 3600:
-            return f"{time_diff // 60} min ago"
-        elif time_diff < 86400:
-            return f"{time_diff // 3600} hr ago"
-        else:
-            return f"{time_diff // 86400} days ago"
-        
 
     async def update_watering_display(self, watering_unit_data, dfr_moisture_sensor_data):
-        self.draw_display_mode_title("H²O")
-        
+        self.draw_display_mode_title("Watering")
         # Water tank capacity bar graph
         bar_width = 20
         bar_height = 180
@@ -292,31 +276,30 @@ class PicoEnviroPlusDisplayMgr:
         self.display.set_pen(self.WHITE)
         
         # Display moisture
-        self.display.text(f"Moisture", x_offset, y_offset, scale=2)
-        y_offset += 20
+        self.display.text(f"Moisture Level:", x_offset, y_offset, scale=2)
+        y_offset += 25
         
-        self.display.text(f"M5: {watering_unit_data['moisture']:.1f}%", x_offset, y_offset, scale=2)
-        y_offset += 25
-        self.display.text(f"DFR: {dfr_moisture_sensor_data['moisture_percent']:.1f}%", x_offset, y_offset, scale=2)
-        y_offset += 25
+        self.display.text(f"M5  | {watering_unit_data['moisture']:.1f}%", x_offset, y_offset, scale=2)
+        y_offset += 20
+        self.display.text(f"DFR | {dfr_moisture_sensor_data['moisture_percent']:.1f}%", x_offset, y_offset, scale=2)
+        y_offset += 28
         
         self.display.line(25, y_offset - 10, self.DISPLAY_WIDTH, y_offset - 10, 1)
         
         self.display.set_pen(self.CYAN)
         
-        self.display.text(f"Last watered:", x_offset, y_offset, scale=2)
+        self.display.text(f"M5 Last watered:", x_offset, y_offset, scale=2)
         y_offset += 20
         
-        last_watered_time = self.calculate_time_since_last_watered(watering_unit_data['last_watered'])
-        self.display.text(f"-> {last_watered_time}", x_offset, y_offset, scale=2)
-        y_offset += 25
+        self.display.text(f"{watering_unit_data['last_watered']}", x_offset, y_offset, scale=2)
+        y_offset += 30
         
-        self.display.text(f"Water left:", x_offset, y_offset, scale=2)
+        self.display.text(f"M5 Water left:", x_offset, y_offset, scale=2)
         y_offset += 20
         
         percentage = (watering_unit_data['water_left'] / self.max_water_tank_capacity) * 100
-        self.display.text(f"-> {watering_unit_data['water_left']:.0f}ml ({percentage:.0f}%)", x_offset, y_offset, scale=2)
-        y_offset += 25
+        self.display.text(f"{watering_unit_data['water_left']:.0f}ml ({percentage:.0f}%)", x_offset, y_offset, scale=2)
+        y_offset += 30
         
         
         self.draw_button_labels()

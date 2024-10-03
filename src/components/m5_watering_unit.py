@@ -24,8 +24,8 @@ class M5WateringUnit:
         self.WATERING_DURATION = config.WATERING_DURATION
         
         # State variables
-        self.raw_moisture_value = self.moisture_sensor.read_u16()
-        self.current_moisture = self.read_moisture()
+        self.raw_moisture_value = 0
+        self.current_moisture_percent = 0
         self.water_used = 0
         self.last_watered = 0
         self.is_watering = False
@@ -43,7 +43,7 @@ class M5WateringUnit:
     def set_system_manager(self, system_manager):
         self.system_manager = system_manager
         
-    def read_moisture(self):
+    async def read_moisture(self):
         try:
             self.raw_moisture_value = self.moisture_sensor.read_u16()
             
@@ -61,11 +61,9 @@ class M5WateringUnit:
             else:
                 moisture_percent = ((self.MOISTURE_SENSOR_DRY_VALUE - self.raw_moisture_value) / moisture_range) * 100
 
-            moisture_percent = max(0, min(100, moisture_percent))
-            return moisture_percent
+            self.current_moisture_percent = max(0, min(100, moisture_percent))
         except Exception as e:
             self.log_manager.log(f"Error reading moisture: {e}")
-            return None
 
     async def control_pump(self, duration):
         current_time = utime.time()
@@ -115,7 +113,7 @@ class M5WateringUnit:
         with self.lock:
             return {
                 "raw_moisture_value": self.raw_moisture_value,
-                "moisture": round(self.current_moisture, 2) if self.current_moisture is not None else None,
+                "moisture": round(self.current_moisture_percent, 2) if self.current_moisture_percent is not None else None,
                 "water_used": round(self.water_used, 2),
                 "water_left": round(self.water_tank.get_capacity(), 2),
                 "last_watered": self.last_watered,

@@ -1,4 +1,5 @@
 from machine import ADC, Pin
+import uasyncio
 import _thread
 
 class DFRobotMoistureSensor:
@@ -43,7 +44,7 @@ class DFRobotMoistureSensor:
             return None
         
         
-    async def check_moisture(self):
+    async def read_moisture(self):
         with self.lock:
             self.moisture_percent = self.calculate_moisture_lvl()
             if self.moisture_percent is None:
@@ -51,11 +52,6 @@ class DFRobotMoistureSensor:
                 if self.system_manager:
                     self.system_manager.add_error("DFR moisture_read")
                 return
-
-            self.log_mgr.log(f"DFR Soil moisture level: {self.moisture_percent:.2f}%")
-
-            if self.moisture_percent < self.THRESHOLD:
-                self.log_mgr.log(f"DFR moisture below threshold ({self.THRESHOLD}%)")
                 
     def get_moisture_data(self):
         return {

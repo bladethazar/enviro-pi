@@ -10,7 +10,7 @@ class InfluxDataManager:
         self.org = config.INFLUXDB_ORG
         self.bucket = config.INFLUXDB_BUCKET
         self.token = config.INFLUXDB_TOKEN
-        self.lookup_interval_in_days = 30
+        self.lookup_interval_in_days = config.INFLUXDB_LOOKUP_INTERVAL
 
     async def _query_influxdb(self, query):
         url = f"{self.base_url}/query?org={self.org}"
@@ -108,8 +108,7 @@ class InfluxDataManager:
             last_watered = await self.get_last_watered_time()
             if last_watered is not None:
                 try:
-                    last_watered_time = utime.localtime(int(last_watered))
-                    self.log_manager.log(f"M5 Watering Unit last watered: {last_watered_time}")
+                    self.log_manager.log(f"M5 Watering Unit last watered: {last_watered}")
                 except ValueError:
                     self.log_manager.log(f"Error converting last watered time: {last_watered}")
             else:

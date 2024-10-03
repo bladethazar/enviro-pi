@@ -128,7 +128,6 @@ class DataManager:
         threshold = 0.5 * avg  # 50% deviation threshold, adjust as needed
         
         if deviation > threshold:
-            self.log_manager.log(f"Spike detected in {sensor_name}: {value}. Using average: {avg}")
             filtered_value = avg
         else:
             filtered_value = value
@@ -142,14 +141,6 @@ class DataManager:
     def prepare_mqtt_sensor_data_for_publishing(self, m5_watering_unit_data, dfr_moisture_sensor_data, enviro_plus_data, system_data, current_config_data):
         try:
             mqtt_data = system_data
-            # Convert last_watered to Europe/Berlin timezone
-            if 'last_watered' in m5_watering_unit_data:
-                    last_watered_time = utime.localtime(int(m5_watering_unit_data['last_watered']) + (self.config.DST_HOURS * 3600))
-                    formatted_time = "{:04d}-{:02d}-{:02d} {:02d}:{:02d}:{:02d}".format(
-                        last_watered_time[0], last_watered_time[1], last_watered_time[2],
-                        last_watered_time[3], last_watered_time[4], last_watered_time[5]
-                    )
-                    m5_watering_unit_data['last_watered'] = formatted_time
             data = {
                 "m5-watering-unit": m5_watering_unit_data,
                 "dfr-moisture-sensor": dfr_moisture_sensor_data,
