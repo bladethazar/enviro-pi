@@ -5,9 +5,10 @@ import _thread
 import gc
 
 class M5WateringUnit:
-    def __init__(self, config, system_manager, log_manager, water_tank):
+    def __init__(self, config, system_manager, log_manager, data_manager, water_tank):
         self.system_manager = system_manager
         self.log_manager = log_manager
+        self.data_manager = data_manager
         self.system_manager = None
         self.config = config
         self.water_tank = water_tank
@@ -45,7 +46,7 @@ class M5WateringUnit:
         
     async def read_moisture(self):
         try:
-            self.raw_moisture_value = self.moisture_sensor.read_u16()
+            self.raw_moisture_value = self.data_manager.filter_spike("m5_moisture_sensor" ,self.moisture_sensor.read_u16())
             
             # Calculate moisture percentage
             moisture_range = self.MOISTURE_SENSOR_DRY_VALUE - self.MOISTURE_SENSOR_WET_VALUE

@@ -137,8 +137,19 @@ class DataManager:
             history.pop(0)
         
         return filtered_value
+    
+    def convert_epoch(self, epoch_value):
+        if type(int(epoch_value)) is not None:
+        # Convert epoch_value to Europe/Berlin timezone
+            time_value = utime.localtime(int(epoch_value) + (self.config.DST_HOURS * 3600))
+            formatted_time = "{:04d}-{:02d}-{:02d} {:02d}:{:02d}:{:02d}".format(
+                time_value[0], time_value[1], time_value[2],
+                time_value[3], time_value[4], time_value[5]
+            )
+        return formatted_time if not None else epoch_value
 
     def prepare_mqtt_sensor_data_for_publishing(self, m5_watering_unit_data, dfr_moisture_sensor_data, enviro_plus_data, system_data, current_config_data):
+        m5_watering_unit_data['last_watered'] = self.convert_epoch(m5_watering_unit_data['last_watered'])
         try:
             mqtt_data = system_data
             data = {

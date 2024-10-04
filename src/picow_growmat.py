@@ -34,8 +34,8 @@ class PicoWGrowmat:
         self.influx_data_manager = InfluxDataManager(self.config_mgr, self.log_mgr)
 
         self.water_tank = WaterTank(self.config_mgr.WATER_TANK_FULL_CAPACITY, self.log_mgr)
-        self.m5_watering_unit = M5WateringUnit(self.config_mgr, self.system_mgr, self.log_mgr, self.water_tank)
-        self.dfr_moisture_sensor = DFRobotMoistureSensor(self.config_mgr, self.log_mgr)
+        self.m5_watering_unit = M5WateringUnit(self.config_mgr, self.system_mgr, self.log_mgr, self.data_mgr, self.water_tank)
+        self.dfr_moisture_sensor = DFRobotMoistureSensor(self.config_mgr, self.log_mgr, self.data_mgr)
         self.enviro_plus = PicoEnviroPlus(self.config_mgr, self.log_mgr, self.data_mgr, self.water_tank.reset_capacity, self.m5_watering_unit)
         self.enviro_plus_led = self.enviro_plus.get_led()
         self.external_watering_button = MomentaryButton(self.config_mgr.MOMENTARY_BUTTON_PIN, sample_size=10, threshold=8)

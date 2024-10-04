@@ -3,9 +3,10 @@ import uasyncio
 import _thread
 
 class DFRobotMoistureSensor:
-    def __init__(self, config, log_manager) -> None:
+    def __init__(self, config, log_manager, data_mgr) -> None:
         self.sensor_pin = ADC(Pin(config.DFR_MOISTURE_SENSOR_PIN))
         self.log_mgr = log_manager
+        self.data_mgr = data_mgr
         
         # Configuration values
         self.SENSOR_DRY_VALUE = config.DFR_MOISTURE_SENSOR_DRY_VALUE
@@ -22,7 +23,7 @@ class DFRobotMoistureSensor:
     def calculate_moisture_lvl(self):
         try:
             
-            self.moisture_raw = self.sensor_pin.read_u16()
+            self.moisture_raw = self.data_mgr.filter_spike("dfr_moisture_sensor", self.sensor_pin.read_u16())
             # Calculate moisture percentage
             moisture_range = self.SENSOR_DRY_VALUE - self.SENSOR_WET_VALUE
             if moisture_range == 0:
