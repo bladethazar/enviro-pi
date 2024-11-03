@@ -149,7 +149,8 @@ class DataManager:
         return formatted_time if not None else epoch_value
 
     def prepare_mqtt_sensor_data_for_publishing(self, m5_watering_unit_data, dfr_moisture_sensor_data, enviro_plus_data, system_data, current_config_data):
-        m5_watering_unit_data['last_watered'] = self.convert_epoch(m5_watering_unit_data['last_watered'])
+        if type(m5_watering_unit_data['last_watered']) == int:
+            m5_watering_unit_data['last_watered'] = self.convert_epoch(m5_watering_unit_data['last_watered'])
         try:
             mqtt_data = system_data
             data = {

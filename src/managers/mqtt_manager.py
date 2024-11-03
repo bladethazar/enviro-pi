@@ -118,20 +118,13 @@ class MQTTManager:
                 self.dfr_moisture_sensor.SENSOR_DRY_VALUE = self.config.DFR_MOISTURE_SENSOR_DRY_VALUE
             elif topic == f"{self.config.MQTT_CLIENT_NAME}/config/DFR_MOISTURE_SENSOR_WET_VALUE":
                 self.dfr_moisture_sensor.SENSOR_WET_VALUE = self.config.DFR_MOISTURE_SENSOR_WET_VALUE
-                
             elif topic == f"{self.config.MQTT_CLIENT_NAME}/config/WATERING_DURATION":
                 self.m5_watering_unit.WATERING_DURATION = self.config.WATERING_DURATION
-            elif topic == f"{self.config.MQTT_CLIENT_NAME}/config/WATERING_PAUSE_DURATION":
-                self.m5_watering_unit.WATERING_PAUSE_DURATION = self.config.WATERING_PAUSE_DURATION
-            elif topic == f"{self.config.MQTT_CLIENT_NAME}/config/WATERING_MAX_CYCLES":
-                self.m5_watering_unit.WATERING_MAX_CYCLES = self.config.WATERING_MAX_CYCLES
                 
         elif topic == f"{self.config.MQTT_CLIENT_NAME}/control/watering":
             uasyncio.create_task(self.handle_watering_control(msg))
         elif topic == f"{self.config.MQTT_CLIENT_NAME}/control/reset-water-tank":
             uasyncio.create_task(self.handle_reset_water_tank(msg))
-        elif topic == f"{self.config.MQTT_CLIENT_NAME}/control/toggle-auto-watering":
-            uasyncio.create_task(self.handle_toggle_automated_watering(msg))
         elif topic == f"{self.config.MQTT_CLIENT_NAME}/control/restart-system":
             uasyncio.create_task(self.handle_system_restart(msg))
             
@@ -173,16 +166,6 @@ class MQTTManager:
             self.log_mgr.log(f"Unknown control command: {msg}")
 
         
-    async def handle_toggle_automated_watering(self, msg):
-        if self.m5_watering_unit is None:
-            self.log_mgr.log("Watering unit not set. Cannot toggle auto-watering.")
-            return
-        if msg.lower() == "toggle":
-            self.log_mgr.log("Toggling auto-watering via MQTT control")
-            self.m5_watering_unit.toggle_auto_watering()
-        else:
-            self.log_mgr.log(f"Unknown control command: {msg}")
-            
             
     async def handle_system_restart(self, msg):
         if self.system_manager is None:

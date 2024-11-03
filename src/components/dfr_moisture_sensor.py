@@ -24,6 +24,7 @@ class DFRobotMoistureSensor:
         try:
             
             self.moisture_raw = self.data_mgr.filter_spike("dfr_moisture_sensor", self.sensor_pin.read_u16())
+            # self.log_mgr.log(f"dfr moisture raw: {self.moisture_raw}")
             # Calculate moisture percentage
             moisture_range = self.SENSOR_DRY_VALUE - self.SENSOR_WET_VALUE
             if moisture_range == 0:
