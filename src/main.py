@@ -1,9 +1,9 @@
 import uasyncio
-from picow_growmat import PicoWGrowmat
+from enviro_pi import EnviroPi
 
 def main():
-    growmat = PicoWGrowmat()
-    uasyncio.run(growmat.run())
+    enviro_pi = EnviroPi()
+    uasyncio.run(enviro_pi.run())
 
 if __name__ == "__main__":
     main()

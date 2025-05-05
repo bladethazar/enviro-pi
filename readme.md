@@ -1,8 +1,8 @@
-# PicoW-Growmat: Advanced Plant Monitoring and Watering System
+# Enviro-Pi: Advanced Plant Monitoring and Watering System
 
 ## Project Overview
 
-PicoW-Growmat is a sophisticated plant monitoring and automated watering system designed for use in real growhouse environments. Built on the Raspberry Pi Pico W platform and utilizing MicroPython, this system integrates various sensors and components to provide comprehensive plant care, environmental monitoring, and intelligent watering control.
+Enviro-Pi is a sophisticated plant monitoring and automated watering system designed for use in real growhouse environments. Built on the Raspberry Pi Pico W platform and utilizing MicroPython, this system integrates various sensors and components to provide comprehensive plant care, environmental monitoring, and intelligent watering control.
 
 ### Key Features
 
@@ -26,7 +26,7 @@ PicoW-Growmat is a sophisticated plant monitoring and automated watering system 
 ## Software Requirements
 
 - MicroPython firmware for Raspberry Pi Pico W (picow-v1.23.0-1-pimoroni-micropython.uf2)
-- Custom PicoW-Growmat software (included in this repository)
+- Custom Enviro-Pi software (included in this repository)
 
 ## Setup Instructions
 
@@ -43,7 +43,7 @@ PicoW-Growmat is a sophisticated plant monitoring and automated watering system 
 
 ## Configuration
 
-The `config.json` file is the central configuration point for PicoW-Growmat. Key configuration sections include:
+The `config.json` file is the central configuration point for Enviro-Pi. Key configuration sections include:
 
 - Network settings (Wi-Fi, MQTT, InfluxDB)
 - Watering control parameters
@@ -55,7 +55,7 @@ Refer to `config.json.template` for a complete list of configurable options.
 
 ## Usage
 
-Once powered on and configured, PicoW-Growmat will:
+Once powered on and configured, Enviro-Pi will:
 
 1. Establish network connections (Wi-Fi, MQTT, InfluxDB)
 2. Initialize all sensors and components
@@ -89,7 +89,7 @@ Once powered on and configured, PicoW-Growmat will:
 
 ## Contributing
 
-Contributions to PicoW-Growmat are welcome! Please fork the repository and submit a pull request with your improvements.
+Contributions to Enviro-Pi are welcome! Please fork the repository and submit a pull request with your improvements.
 
 ## License
 
