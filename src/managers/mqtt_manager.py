@@ -73,7 +73,7 @@ class MQTTManager:
             self.system_manager.start_processing("mqtt_connect")
         self.log_mgr.log("MQTT connecting ...")
         try:
-            self.client = MQTTClient(self.config.MQTT_CLIENT_NAME, self.config.MQTT_BROKER_ADDRESS, self.config.MQTT_BROKER_PORT)
+            self.client = MQTTClient(self.config.MQTT_CLIENT_NAME, self.config.MQTT_BROKER_ADDRESS, self.config.MQTT_BROKER_PORT, self.config.MQTT_BROKER_USER, self.config.MQTT_BROKER_PW)
             self.client.set_callback(self.on_message)
             self.client.connect()
             self.is_connected = True

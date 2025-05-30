@@ -1,5 +1,6 @@
 import math
 import utime
+import urequests
 import ntptime
 import machine
 
@@ -76,39 +77,58 @@ class DataManager:
         else:
             return "Bright"
 
-    def describe_growhouse_environment(self, temperature, humidity, lux):
-        env_status = "Optimal"
-        issues = []
+    def get_weather_data_from_api(self):
+        try:
+            url = f"{self.config.WEATHER_API_BASE_URL}/current.json" + f"?key={self.config.WEATHER_API_TOKEN}" + f"&q={self.config.WEATHER_FOR}&aqi=yes"
+            response = urequests.get(url)
 
-        if temperature < 20 or temperature > 30:
-            issues.append("Temperature")
-            env_status = "Suboptimal"
-        if humidity < 50 or humidity > 90:
-            issues.append("Humidity")
-            env_status = "Suboptimal"
+            if response.status_code != 200:
+                self.log_manager.log(f"Weather API error: {response.status_code}")
+                response.close()
+                return None
 
-        current_hour = self.system_mgr.get_local_hour()
-        start_hour = self.config.LIGHT_SCHEDULE_START_HOUR
-        end_hour = self.config.LIGHT_SCHEDULE_END_HOUR
+            raw = response.json()
+            response.close()
 
-        # Determine if it's daytime based on the schedule
-        is_daytime = False
-        if start_hour < end_hour:
-            # Simple case: start time is before end time
-            is_daytime = start_hour <= current_hour < end_hour
-        else:
-            # Complex case: schedule spans midnight
-            is_daytime = current_hour >= start_hour or current_hour < end_hour
+            current = raw.get("current", {})
+            condition = current.get("condition", {})
+            airq = current.get("air_quality", {})
+            location = raw.get("location", {})
 
-        if is_daytime:
-            light_status = self.describe_light(lux)
-            if lux < self.config.LIGHT_THRESHOLD_LOW:
-                issues.append(f"Light ({light_status})")
-                env_status = "Suboptimal"
-        else:
-            light_status = "Night time"
+            icon_url = condition.get("icon", "")
+            if icon_url.startswith("//"):
+                icon_url = "https:" + icon_url  # Make it a valid HTTPS URL
 
-        return env_status, issues, light_status
+            weather_data = {
+                "temp_c": current.get("temp_c"),
+                "feelslike_c": current.get("feelslike_c"),
+                "condition": condition.get("text", ""),
+                "icon_url": icon_url,
+                "wind_kph": current.get("wind_kph"),
+                "wind_dir": current.get("wind_dir"),
+                "pressure_mb": current.get("pressure_mb"),
+                "humidity": current.get("humidity"),
+                "uv": current.get("uv"),
+                "air_quality": {
+                    "pm2_5": airq.get("pm2_5"),
+                    "pm10": airq.get("pm10"),
+                    "co": airq.get("co"),
+                    "no2": airq.get("no2"),
+                    "o3": airq.get("o3")
+                },
+                "location": location.get("name"),
+                "localtime": location.get("localtime")
+            }
+
+            self.log_manager.log("Weather data fetched.")
+            return weather_data
+
+        except Exception as e:
+            self.log_manager.log(f"Weather fetch error: {e}")
+            return None
+
+
+        
     
 
     def filter_spike(self, sensor_name, value):
@@ -148,14 +168,10 @@ class DataManager:
             )
         return formatted_time if not None else epoch_value
 
-    def prepare_mqtt_sensor_data_for_publishing(self, m5_watering_unit_data, dfr_moisture_sensor_data, enviro_plus_data, system_data, current_config_data):
-        if type(m5_watering_unit_data['last_watered']) == int:
-            m5_watering_unit_data['last_watered'] = self.convert_epoch(m5_watering_unit_data['last_watered'])
+    def prepare_mqtt_sensor_data_for_publishing(self, enviro_plus_data, system_data, current_config_data):
         try:
             mqtt_data = system_data
             data = {
-                "m5-watering-unit": m5_watering_unit_data,
-                "dfr-moisture-sensor": dfr_moisture_sensor_data,
                 "enviro-plus": enviro_plus_data,
                 "system": mqtt_data["system"],
                 "adc": mqtt_data["adc"],

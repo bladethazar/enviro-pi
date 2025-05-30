@@ -11,16 +11,12 @@ from adcfft import ADCFFT
 import gc
 
 class PicoEnviroPlus:
-    def __init__(self, config, log_manager, data_mgr, reset_water_tank_capacity, m5_watering_unit):
+    def __init__(self, config, log_manager, data_mgr):
         self.config = config
         self.log_manager = log_manager
         self.data_mgr = data_mgr
         self.system_manager = None
         self.display_manager = None
-        self.m5_watering_unit = m5_watering_unit
-        self.reset_water_tank_capacity = reset_water_tank_capacity
-        self.trigger_watering = self.m5_watering_unit.trigger_watering
-        self.reset_water_used = self.m5_watering_unit.reset_water_used
 
         # Initialize display
         self.display = PicoGraphics(display=DISPLAY_ENVIRO_PLUS, rotate=90)
@@ -37,8 +33,8 @@ class PicoEnviroPlus:
 
         # Display settings
         self.display_backlight_on = True
-        self.display_modes = ["Sensor", "Watering", "Log", "System"]
-        self.current_mode_index = 1  # Start with Watering mode
+        self.display_modes = ["Sensor", "Weather", "Log", "System"]
+        self.current_mode_index = 1  # Start with Sensor mode
         self.display_mode = self.display_modes[self.current_mode_index]
 
         # Sensor data
@@ -93,8 +89,8 @@ class PicoEnviroPlus:
             gas_quality = self.data_mgr.interpret_gas_reading(gas)
             mic_db = self.data_mgr.interpret_mic_reading(mic_reading)
 
-            env_status, issues, light_status = self.data_mgr.describe_growhouse_environment(
-                corrected_temperature, corrected_humidity, adjusted_enviro_plus_lux)
+            # env_status, issues, light_status = self.data_mgr.describe_growhouse_environment(
+            #     corrected_temperature, corrected_humidity, adjusted_enviro_plus_lux)
             self.sensor_data = {
                 "temperature": corrected_temperature,
                 "humidity": corrected_humidity,
@@ -102,11 +98,11 @@ class PicoEnviroPlus:
                 "gas": gas,
                 "gas_quality": gas_quality,
                 "lux": adjusted_enviro_plus_lux,
-                "light_status": light_status,
+                # "light_status": light_status,
                 "mic": mic_db,
-                "status": bme_data[4],
-                "env_status": env_status,
-                "env_issues": issues
+                "status": bme_data[4]
+                # "env_status": env_status,
+                # "env_issues": issues
             }
             self.last_sensor_read = utime.ticks_ms()
             return self.sensor_data
@@ -163,8 +159,8 @@ class PicoEnviroPlus:
         action = action_tuple[0]  # The first element of the tuple is the action
 
         try:
-            if action == self.display_manager.trigger_watering:
-                await self.trigger_watering()
+            if action == self.display_manager.initiate_system_restart:
+                await self.initiate_system_restart()
             elif callable(action):
                 result = action()
                 if hasattr(result, '__await__'):

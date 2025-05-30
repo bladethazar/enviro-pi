@@ -60,41 +60,41 @@ class InfluxDataManager:
             self.log_manager.log(f"Error converting to float: {value}")
             return None
 
-    async def get_water_tank_level(self):
-        query = f'''
-        from(bucket:"{self.bucket}")
-          |> range(start: -{self.lookup_interval_in_days}d)
-          |> filter(fn: (r) => r.entity_id == "water_tank_level")
-          |> last()
-        '''
-        result = await self._query_influxdb(query)
-        if result:
-            try:
-                parsed_result = self._parse_csv_response(result)
-                if parsed_result and '_value' in parsed_result:
-                    return self._safe_float_conversion(parsed_result['_value'])
-            except Exception as e:
-                self.log_manager.log(f"Error parsing water tank level: {e}")
-                self.log_manager.log(f"Raw response: {result}")
-        return None
+    # async def get_water_tank_level(self):
+    #     query = f'''
+    #     from(bucket:"{self.bucket}")
+    #       |> range(start: -{self.lookup_interval_in_days}d)
+    #       |> filter(fn: (r) => r.entity_id == "water_tank_level")
+    #       |> last()
+    #     '''
+    #     result = await self._query_influxdb(query)
+    #     if result:
+    #         try:
+    #             parsed_result = self._parse_csv_response(result)
+    #             if parsed_result and '_value' in parsed_result:
+    #                 return self._safe_float_conversion(parsed_result['_value'])
+    #         except Exception as e:
+    #             self.log_manager.log(f"Error parsing water tank level: {e}")
+    #             self.log_manager.log(f"Raw response: {result}")
+    #     return None
 
-    async def get_last_watered_time(self):
-        query = f'''
-        from(bucket:"{self.bucket}")
-          |> range(start: -{self.lookup_interval_in_days}d)
-          |> filter(fn: (r) => r["friendly_name"] == "M5 Unit Last Watered")
-          |> last()
-        '''
-        result = await self._query_influxdb(query)
-        if result:
-            try:
-                parsed_result = self._parse_csv_response(result)
-                if parsed_result and '_value' in parsed_result:
-                    return 0 if parsed_result['_value'] == "Never" else parsed_result['_value']
-            except Exception as e:
-                self.log_manager.log(f"Error parsing last watered time: {e}")
-                self.log_manager.log(f"Raw response: {result}")
-        return None
+    # async def get_last_watered_time(self):
+    #     query = f'''
+    #     from(bucket:"{self.bucket}")
+    #       |> range(start: -{self.lookup_interval_in_days}d)
+    #       |> filter(fn: (r) => r["friendly_name"] == "M5 Unit Last Watered")
+    #       |> last()
+    #     '''
+    #     result = await self._query_influxdb(query)
+    #     if result:
+    #         try:
+    #             parsed_result = self._parse_csv_response(result)
+    #             if parsed_result and '_value' in parsed_result:
+    #                 return 0 if parsed_result['_value'] == "Never" else parsed_result['_value']
+    #         except Exception as e:
+    #             self.log_manager.log(f"Error parsing last watered time: {e}")
+    #             self.log_manager.log(f"Raw response: {result}")
+    #     return None
 
     async def query_task(self):
         try:

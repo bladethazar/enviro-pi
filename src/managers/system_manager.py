@@ -255,17 +255,6 @@ class SystemManager:
 
     def get_current_config_data(self):
         return {
-            "moisture_treshold": self.config.MOISTURE_THRESHOLD,
-            "m5_moisture_sensor_dry_value": self.config.M5_MOISTURE_SENSOR_DRY_VALUE,
-            "m5_moisture_sensor_wet_value": self.config.M5_MOISTURE_SENSOR_WET_VALUE,
-            "dfr_moisture_sensor_dry_value": self.config.DFR_MOISTURE_SENSOR_DRY_VALUE,
-            "dfr_moisture_sensor_wet_value": self.config.DFR_MOISTURE_SENSOR_WET_VALUE,
-            "watering_duration": self.config.WATERING_DURATION,
-            "watering_pause_duration": self.config.WATERING_PAUSE_DURATION,
-            "watering_check_interval": self.config.WATERING_CHECK_INTERVAL,
-            "watering_cycles_configured": self.config.WATERING_MAX_CYCLES,
-            "light_schedule_start_hour": self.config.LIGHT_SCHEDULE_START_HOUR,
-            "light_schedule_end_hour": self.config.LIGHT_SCHEDULE_END_HOUR,
             "temperature_offset": self.config.TEMPERATURE_OFFSET,
             "humidity_offset": self.config.HUMIDITY_OFFSET,
             "enviro_plus_display_brightness": self.config.ENVIRO_PLUS_DISPLAY_BRIGHTNESS,
