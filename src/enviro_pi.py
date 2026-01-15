@@ -1,6 +1,4 @@
-import sys
 import uasyncio
-import machine
 import gc
 import micropython
 import utime
@@ -15,7 +13,6 @@ from managers.log_manager import LogManager
 from managers.pp_enviro_plus_display_mgr import PicoEnviroPlusDisplayMgr
 from managers.influx_data_manager import InfluxDataManager
 from components.pp_enviro_plus import PicoEnviroPlus
-from components.momentary_button import MomentaryButton 
 
 class EnviroPi:
     def __init__(self):
@@ -29,10 +26,11 @@ class EnviroPi:
         self.wifi_mgr = WiFiManager(self.config_mgr, self.log_mgr)
         self.mqtt_mgr = MQTTManager(self.config_mgr, self.log_mgr)
         self.influx_data_manager = InfluxDataManager(self.config_mgr, self.log_mgr)
+        if not self.influx_data_manager.enabled:
+            self.influx_data_manager = None
 
         self.enviro_plus = PicoEnviroPlus(self.config_mgr, self.log_mgr, self.data_mgr)
         self.enviro_plus_led = self.enviro_plus.get_led()
-        self.external_button = MomentaryButton(self.config_mgr.MOMENTARY_BUTTON_PIN, sample_size=10, threshold=8)
 
         self.system_mgr.set_led(self.enviro_plus_led)
         self.enviro_plus_display_mgr = PicoEnviroPlusDisplayMgr(self.config_mgr, self.enviro_plus, self.log_mgr, self.data_mgr, self.system_mgr)
@@ -49,7 +47,6 @@ class EnviroPi:
     def _initialize_state(self):
         self.current_status = "running"
         self.last_mqtt_publish = 0
-        self.external_button_pressed = False
 
     async def run(self):
         await self.startup()
@@ -61,10 +58,15 @@ class EnviroPi:
         self.enviro_plus.set_display_mode("Log")
 
         await self._initialize_connections()
+        if self.influx_data_manager:
+            await self.influx_data_manager.check_availability()
         await self._setup_components()
         await self._start_tasks()
 
-        self.enviro_plus.set_display_mode(self.config_mgr.DEFAULT_DISPLAY_MODE)
+        default_mode = getattr(self.config_mgr, "DEFAULT_DISPLAY_MODE", "Overview")
+        if default_mode not in self.enviro_plus.display_modes:
+            default_mode = "Overview"
+        self.enviro_plus.set_display_mode(default_mode)
         self.log_mgr.log("Startup sequence completed")
 
     async def _initialize_connections(self):
@@ -87,16 +89,6 @@ class EnviroPi:
         uasyncio.create_task(self.mqtt_mgr.run())
         uasyncio.create_task(self.system_mgr.run())
         uasyncio.create_task(self.enviro_plus.run())
-        uasyncio.create_task(self.check_external_button())
-
-        # try:
-        #     water_tank_level, last_watered = await uasyncio.wait_for(self.influx_data_manager.query_task(), 10)
-        #     if water_tank_level is not None:
-        #         self.water_tank.set_capacity(water_tank_level)
-        #     if last_watered is not None:
-        #         self.m5_watering_unit.set_last_watered_time(last_watered)
-        # except uasyncio.TimeoutError:
-        #     self.log_mgr.log("InfluxDB query timed out")
 
     async def main_loop(self):
         while True:
@@ -104,7 +96,6 @@ class EnviroPi:
                 gc.collect()
                 self.system_mgr.update_system_data()
                 
-                await self.handle_external_button()
                 await self.process_sensor_data()
                 
                 self.enviro_plus.check_buttons()
@@ -129,32 +120,27 @@ class EnviroPi:
         else:
             self.log_mgr.log("Gas sensor heater not stable, skipping MQTT publishing")
 
-    async def check_external_button(self):
-        while True:
-            if self.external_button.is_pressed():
-                self.external_button_pressed = True
-            await uasyncio.sleep_ms(100)
-
-    async def handle_external_button(self):
-        if self.external_button_pressed:
-            self.log_mgr.log("External button pressed")
-            
-            await self.enviro_plus_display_mgr.initiate_system_restart()
-            self.external_button_pressed = False
-
     async def read_enviro_plus_sensors(self):
         return self.enviro_plus.get_sensor_data()
 
     async def update_display(self, sensor_data):
         if sensor_data is None:
-            return
+            sensor_data = self.enviro_plus.get_sensor_data()
+            if sensor_data is None:
+                return
         
         try:
             display_mode = self.enviro_plus.display_mode
-            if display_mode == "Sensor":
-                await self.enviro_plus_display_mgr.update_sensor_display(sensor_data)
-            elif display_mode == "Weather":
-                await self.enviro_plus_display_mgr.update_weather_display()
+            if display_mode == "Overview":
+                await self.enviro_plus_display_mgr.update_overview_display(sensor_data)
+            elif display_mode == "Air":
+                await self.enviro_plus_display_mgr.update_air_display(sensor_data)
+            elif display_mode == "VPD":
+                await self.enviro_plus_display_mgr.update_vpd_display(sensor_data)
+            elif display_mode == "Light":
+                await self.enviro_plus_display_mgr.update_light_display(sensor_data)
+            elif display_mode == "Sound":
+                await self.enviro_plus_display_mgr.update_sound_display(sensor_data)
             elif display_mode == "Log":
                 await self.enviro_plus_display_mgr.update_log_display()
             elif display_mode == "System":

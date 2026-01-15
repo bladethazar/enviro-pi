@@ -1,6 +1,5 @@
 import math
 import utime
-import urequests
 import ntptime
 import machine
 
@@ -13,12 +12,14 @@ class DataManager:
         self.window_size = self.config.SENSOR_DATA_AVG_WINDOW_SIZE
 
     def correct_temperature_reading(self, temperature):
-        return round(temperature - self.config.TEMPERATURE_OFFSET, 2)
+        offset = getattr(self.config, "TEMPERATURE_OFFSET", 0)
+        return round(temperature - offset, 2)
 
     def correct_humidity_reading(self, humidity, temperature, corrected_temperature):
         dewpoint = temperature - ((100 - humidity) / 5)
         corrected_humidity = max(0, min(100, 100 - (5 * (corrected_temperature - dewpoint))))
-        return round(corrected_humidity - self.config.HUMIDITY_OFFSET, 2)
+        offset = getattr(self.config, "HUMIDITY_OFFSET", 0)
+        return round(corrected_humidity - offset, 2)
 
     def adjust_to_sea_pressure(self, pressure, temperature, altitude):
         pressure_hpa = pressure / 100
@@ -45,8 +46,8 @@ class DataManager:
     
     def interpret_mic_reading(self, mic):
         # Define the range of the microphone input
-        MIC_MIN = self.config.MIC_MIN_VALUE  # Adjusted based on your silent readings
-        MIC_MAX = self.config.MIC_MAX_VALUE  # Assuming 16-bit ADC
+        MIC_MIN = getattr(self.config, "MIC_MIN_VALUE", 30000)  # Adjusted based on your silent readings
+        MIC_MAX = getattr(self.config, "MIC_MAX_VALUE", 65535)  # Assuming 16-bit ADC
 
         # Define the desired dB range
         DB_MIN = 10  # Lowest reading (very quiet room)
@@ -66,70 +67,74 @@ class DataManager:
         return round(max(DB_MIN, min(DB_MAX, db_value)), 1)
     
     def describe_light(self, lux):
-        if lux < self.config.LIGHT_THRESHOLD_VERY_LOW:
+        very_low = getattr(self.config, "LIGHT_THRESHOLD_VERY_LOW", 50)
+        low = getattr(self.config, "LIGHT_THRESHOLD_LOW", 200)
+        moderate = getattr(self.config, "LIGHT_THRESHOLD_MODERATE", 400)
+        good = getattr(self.config, "LIGHT_THRESHOLD_GOOD", 600)
+
+        if lux < very_low:
             return "Very Low"
-        elif lux < self.config.LIGHT_THRESHOLD_LOW:
+        elif lux < low:
             return "Low"
-        elif lux < self.config.LIGHT_THRESHOLD_MODERATE:
+        elif lux < moderate:
             return "Moderate"
-        elif lux < self.config.LIGHT_THRESHOLD_GOOD:
+        elif lux < good:
             return "Good"
         else:
             return "Bright"
 
-    def get_weather_data_from_api(self):
+    def describe_humidity(self, humidity):
+        if humidity < 30:
+            return "Dry"
+        elif humidity < 60:
+            return "OK"
+        else:
+            return "Humid"
+
+    def calculate_dew_point(self, temperature_c, humidity):
         try:
-            url = f"{self.config.WEATHER_API_BASE_URL}/current.json" + f"?key={self.config.WEATHER_API_TOKEN}" + f"&q={self.config.WEATHER_FOR}&aqi=yes"
-            response = urequests.get(url)
-
-            if response.status_code != 200:
-                self.log_manager.log(f"Weather API error: {response.status_code}")
-                response.close()
+            if humidity <= 0:
                 return None
-
-            raw = response.json()
-            response.close()
-
-            current = raw.get("current", {})
-            condition = current.get("condition", {})
-            airq = current.get("air_quality", {})
-            location = raw.get("location", {})
-
-            icon_url = condition.get("icon", "")
-            if icon_url.startswith("//"):
-                icon_url = "https:" + icon_url  # Make it a valid HTTPS URL
-
-            weather_data = {
-                "temp_c": current.get("temp_c"),
-                "feelslike_c": current.get("feelslike_c"),
-                "condition": condition.get("text", ""),
-                "icon_url": icon_url,
-                "wind_kph": current.get("wind_kph"),
-                "wind_dir": current.get("wind_dir"),
-                "pressure_mb": current.get("pressure_mb"),
-                "humidity": current.get("humidity"),
-                "uv": current.get("uv"),
-                "air_quality": {
-                    "pm2_5": airq.get("pm2_5"),
-                    "pm10": airq.get("pm10"),
-                    "co": airq.get("co"),
-                    "no2": airq.get("no2"),
-                    "o3": airq.get("o3")
-                },
-                "location": location.get("name"),
-                "localtime": location.get("localtime")
-            }
-
-            self.log_manager.log("Weather data fetched.")
-            return weather_data
-
-        except Exception as e:
-            self.log_manager.log(f"Weather fetch error: {e}")
+            a = 17.62
+            b = 243.12
+            gamma = (a * temperature_c / (b + temperature_c)) + math.log(humidity / 100.0)
+            dew_point = (b * gamma) / (a - gamma)
+            return round(dew_point, 1)
+        except Exception:
             return None
 
+    def calculate_vpd(self, temperature_c, humidity):
+        try:
+            if humidity <= 0:
+                return None
+            # Saturation vapor pressure (kPa)
+            svp = 0.6108 * math.exp((17.27 * temperature_c) / (temperature_c + 237.3))
+            vpd = svp * (1 - (humidity / 100.0))
+            return round(vpd, 2)
+        except Exception:
+            return None
 
-        
-    
+    def describe_vpd(self, vpd_kpa):
+        if vpd_kpa is None:
+            return "N/A"
+        vpd_min = getattr(self.config, "VPD_TARGET_MIN", 0.8)
+        vpd_max = getattr(self.config, "VPD_TARGET_MAX", 1.2)
+        if vpd_kpa < vpd_min:
+            return "Low"
+        if vpd_kpa > vpd_max:
+            return "High"
+        return "OK"
+
+    def describe_sound(self, db_value):
+        if db_value < 30:
+            return "Quiet"
+        elif db_value < 60:
+            return "Normal"
+        elif db_value < 85:
+            return "Loud"
+        else:
+            return "Very Loud"
+
 
     def filter_spike(self, sensor_name, value):
         if sensor_name not in self.moving_averages:
@@ -144,9 +149,10 @@ class DataManager:
         avg = sum(history) / len(history)
         deviation = abs(value - avg)
         
-        # Define threshold as a percentage of the average
-        threshold = 0.5 * avg  # 50% deviation threshold, adjust as needed
-        
+        # Define threshold as a percentage of the average (with floor)
+        min_threshold = getattr(self.config, "SENSOR_SPIKE_MIN_THRESHOLD", 1)
+        threshold = max(min_threshold, 0.5 * abs(avg))  # 50% deviation threshold
+
         if deviation > threshold:
             filtered_value = avg
         else:
@@ -159,14 +165,15 @@ class DataManager:
         return filtered_value
     
     def convert_epoch(self, epoch_value):
-        if type(int(epoch_value)) is not None:
-        # Convert epoch_value to Europe/Berlin timezone
-            time_value = utime.localtime(int(epoch_value) + (self.config.DST_HOURS * 3600))
-            formatted_time = "{:04d}-{:02d}-{:02d} {:02d}:{:02d}:{:02d}".format(
+        try:
+            dst_hours = getattr(self.config, "DST_HOURS", 0)
+            time_value = utime.localtime(int(epoch_value) + (dst_hours * 3600))
+            return "{:04d}-{:02d}-{:02d} {:02d}:{:02d}:{:02d}".format(
                 time_value[0], time_value[1], time_value[2],
                 time_value[3], time_value[4], time_value[5]
             )
-        return formatted_time if not None else epoch_value
+        except Exception:
+            return epoch_value
 
     def prepare_mqtt_sensor_data_for_publishing(self, enviro_plus_data, system_data, current_config_data):
         try:

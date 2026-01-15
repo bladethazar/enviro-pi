@@ -1,4 +1,3 @@
-import json
 import uasyncio
 from umqtt_simple import MQTTClient
 import utime
@@ -11,14 +10,6 @@ class MQTTManager:
         self.is_connected = False
         self.last_publish_time = 0
         self.system_manager = None
-        self.m5_watering_unit = None
-        self.dfr_moisture_sensor = None
-
-    def set_m5_watering_unit(self, m5_watering_unit):
-        self.m5_watering_unit = m5_watering_unit
-        
-    def set_dfr_moisture_sensor(self, dfr_moisture_sensor):
-        self.dfr_moisture_sensor = dfr_moisture_sensor
         
     def set_system_manager(self, system_manager):
         self.system_manager = system_manager
@@ -34,22 +25,21 @@ class MQTTManager:
 
         try:
             for topic, subtopics in self.config.MQTT_TOPICS.items():
-                if topic in data:
-                    for subtopic in subtopics:
-                        if subtopic in data[topic]:
-                            full_topic = f"{self.config.MQTT_CLIENT_NAME}/{topic}/{subtopic}"
-                            message = str(data[topic][subtopic])
-                            try:
-                                result = self.client.publish(full_topic.encode(), message.encode())
-                            except Exception as e:
-                                if self.system_manager:
-                                    self.system_manager.add_error("mqtt_publish")
-                                self.log_mgr.log(f"Exception while publishing to {full_topic}: {e}")
-                        else:
-                            self.log_mgr.log(f"Subtopic {subtopic} not found in data for topic {topic}")
-                else:
-                    self.log_mgr.log(f"Topic {topic} not found in data")
-            
+                payload = data.get(topic)
+                if not payload:
+                    continue
+                for subtopic in subtopics:
+                    if subtopic not in payload:
+                        continue
+                    full_topic = f"{self.config.MQTT_CLIENT_NAME}/{topic}/{subtopic}"
+                    message = str(payload[subtopic])
+                    try:
+                        self.client.publish(full_topic.encode(), message.encode())
+                    except Exception as e:
+                        if self.system_manager:
+                            self.system_manager.add_error("mqtt_publish")
+                        self.log_mgr.log(f"Exception while publishing to {full_topic}: {e}")
+
             self.last_publish_time = utime.time()
             self.log_mgr.log("MQTT data published successful")
             return True
@@ -107,24 +97,7 @@ class MQTTManager:
             _, _, key = topic.split('/')
             self.handle_config_update(key, msg)
             self.config.load_from_file()
-            if topic == f"{self.config.MQTT_CLIENT_NAME}/config/MOISTURE_THRESHOLD":
-                self.m5_watering_unit.MOISTURE_THRESHOLD = self.config.MOISTURE_THRESHOLD
-                self.dfr_moisture_sensor.THRESHOLD = self.config.MOISTURE_THRESHOLD
-            elif topic == f"{self.config.MQTT_CLIENT_NAME}/config/M5_MOISTURE_SENSOR_DRY_VALUE":
-                self.m5_watering_unit.MOISTURE_SENSOR_DRY_VALUE = self.config.M5_MOISTURE_SENSOR_DRY_VALUE
-            elif topic == f"{self.config.MQTT_CLIENT_NAME}/config/M5_MOISTURE_SENSOR_WET_VALUE":
-                self.m5_watering_unit.MOISTURE_SENSOR_WET_VALUE = self.config.M5_MOISTURE_SENSOR_WET_VALUE
-            elif topic == f"{self.config.MQTT_CLIENT_NAME}/config/DFR_MOISTURE_SENSOR_DRY_VALUE":
-                self.dfr_moisture_sensor.SENSOR_DRY_VALUE = self.config.DFR_MOISTURE_SENSOR_DRY_VALUE
-            elif topic == f"{self.config.MQTT_CLIENT_NAME}/config/DFR_MOISTURE_SENSOR_WET_VALUE":
-                self.dfr_moisture_sensor.SENSOR_WET_VALUE = self.config.DFR_MOISTURE_SENSOR_WET_VALUE
-            elif topic == f"{self.config.MQTT_CLIENT_NAME}/config/WATERING_DURATION":
-                self.m5_watering_unit.WATERING_DURATION = self.config.WATERING_DURATION
                 
-        elif topic == f"{self.config.MQTT_CLIENT_NAME}/control/watering":
-            uasyncio.create_task(self.handle_watering_control(msg))
-        elif topic == f"{self.config.MQTT_CLIENT_NAME}/control/reset-water-tank":
-            uasyncio.create_task(self.handle_reset_water_tank(msg))
         elif topic == f"{self.config.MQTT_CLIENT_NAME}/control/restart-system":
             uasyncio.create_task(self.handle_system_restart(msg))
             
@@ -143,30 +116,6 @@ class MQTTManager:
         except Exception as e:
             self.log_mgr.log(f"Error updating configuration: {e}")
 
-    async def handle_watering_control(self, msg):
-        if self.m5_watering_unit is None:
-            self.log_mgr.log("Watering unit not set. Cannot trigger watering.")
-            return
-
-        if msg.lower() == "start":
-            self.log_mgr.log("Triggering watering via MQTT control")
-            await self.m5_watering_unit.trigger_watering()
-        else:
-            self.log_mgr.log(f"Unknown control command: {msg}")
-            
-    async def handle_reset_water_tank(self, msg):
-        if self.m5_watering_unit is None:
-            self.log_mgr.log("Watering unit not set. Cannot reset water tank.")
-            return
-
-        if msg.lower() == "reset":
-            self.log_mgr.log("Resetting water tank level via MQTT control")
-            self.m5_watering_unit.water_tank.reset_capacity()
-        else:
-            self.log_mgr.log(f"Unknown control command: {msg}")
-
-        
-            
     async def handle_system_restart(self, msg):
         if self.system_manager is None:
             self.log_mgr.log("System-Manager not set. Cannot restart system.")

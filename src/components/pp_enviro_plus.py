@@ -4,7 +4,7 @@ import uasyncio
 from machine import Pin, ADC
 from picographics import PicoGraphics, DISPLAY_ENVIRO_PLUS
 from pimoroni import RGBLED, Button
-from breakout_bme68x import BreakoutBME68X
+from breakout_bme68x import BreakoutBME68X, STATUS_HEATER_STABLE
 from pimoroni_i2c import PimoroniI2C
 from breakout_ltr559 import BreakoutLTR559
 from adcfft import ADCFFT
@@ -18,8 +18,8 @@ class PicoEnviroPlus:
         self.system_manager = None
         self.display_manager = None
 
-        # Initialize display
-        self.display = PicoGraphics(display=DISPLAY_ENVIRO_PLUS, rotate=90)
+        # Initialize display (default rotation)
+        self.display = PicoGraphics(display=DISPLAY_ENVIRO_PLUS, rotate=0)
         self.display_width, self.display_height = self.display.get_bounds()
 
         # Initialize LED and buttons
@@ -33,13 +33,19 @@ class PicoEnviroPlus:
 
         # Display settings
         self.display_backlight_on = True
-        self.display_modes = ["Sensor", "Weather", "Log", "System"]
-        self.current_mode_index = 1  # Start with Sensor mode
+        self.display_modes = ["Overview", "VPD", "Air", "Light", "Sound", "System", "Log"]
+        self.current_mode_index = 0
         self.display_mode = self.display_modes[self.current_mode_index]
 
         # Sensor data
         self.last_sensor_read = 0
         self.sensor_data = {}
+
+        # Sensor sampling config (fallbacks for missing config keys)
+        self.sensor_read_samples = getattr(self.config, "SENSOR_READ_SAMPLES", 3)
+        self.sensor_read_delay_ms = getattr(self.config, "SENSOR_READ_DELAY_MS", 50)
+        self.mic_read_samples = getattr(self.config, "MIC_READ_SAMPLES", 5)
+        self.mic_read_delay_ms = getattr(self.config, "MIC_READ_DELAY_MS", 10)
 
         # Temperature edge values
         self.min_temperature = float('inf')
@@ -63,44 +69,114 @@ class PicoEnviroPlus:
             self.bme = BreakoutBME68X(i2c, address=0x77)
             self.ltr559 = BreakoutLTR559(i2c)
             self.adcfft = ADCFFT()
-            self.mic = ADC(Pin(self.config.ENVIRO_PLUS_MICROPHONE_PIN))
+            mic_pin = getattr(self.config, "ENVIRO_PLUS_MICROPHONE_PIN", 26)
+            self.mic = ADC(Pin(mic_pin))
             self.log_manager.log("PicoEnviroPlus sensors initialized.")
         except Exception as e:
             self.log_manager.log(f"Error initializing PicoEnviroPlus sensors: {e}")
 
+    def _is_valid_number(self, value):
+        try:
+            return value is not None and value == value and value != float("inf") and value != float("-inf")
+        except Exception:
+            return False
+
+    def _median(self, values, default=None):
+        if not values:
+            return default
+        ordered = sorted(values)
+        return ordered[len(ordered) // 2]
+
+    def _collect_samples(self, read_fn, sample_count, delay_ms):
+        samples = []
+        for _ in range(sample_count):
+            try:
+                samples.append(read_fn())
+            except Exception:
+                pass
+            if delay_ms:
+                utime.sleep_ms(delay_ms)
+        return samples
+
     def read_sensors(self):
         try:
-            bme_data = self.bme.read()
-            ltr559_data = self.ltr559.get_reading()
-            mic_reading = self.mic.read_u16()
+            bme_samples = self._collect_samples(self.bme.read, self.sensor_read_samples, self.sensor_read_delay_ms)
+            bme_samples = [s for s in bme_samples if isinstance(s, (list, tuple)) and len(s) >= 5]
+            if not bme_samples:
+                raise Exception("No BME68X samples available")
 
-            temperature = bme_data[0]
-            pressure = bme_data[1]
-            humidity = bme_data[2]
-            gas = bme_data[3]
-            enviro_plus_lux = ltr559_data[BreakoutLTR559.LUX] if ltr559_data else 0
+            temperature_samples = [s[0] for s in bme_samples if self._is_valid_number(s[0])]
+            pressure_samples = [s[1] for s in bme_samples if self._is_valid_number(s[1])]
+            humidity_samples = [s[2] for s in bme_samples if self._is_valid_number(s[2])]
+            gas_samples = [s[3] for s in bme_samples if self._is_valid_number(s[3])]
+            status = bme_samples[-1][4]
+
+            temperature = self._median(temperature_samples)
+            pressure = self._median(pressure_samples)
+            humidity = self._median(humidity_samples)
+            gas = self._median(gas_samples)
+
+            if temperature is None or pressure is None or humidity is None:
+                raise Exception("Invalid BME68X readings")
+
+            ltr_samples = self._collect_samples(self.ltr559.get_reading, self.sensor_read_samples, self.sensor_read_delay_ms)
+            lux_samples = []
+            for sample in ltr_samples:
+                if sample:
+                    try:
+                        lux_samples.append(sample[BreakoutLTR559.LUX])
+                    except Exception:
+                        pass
+            enviro_plus_lux = self._median(lux_samples, default=0)
+
+            mic_samples = self._collect_samples(self.mic.read_u16, self.mic_read_samples, self.mic_read_delay_ms)
+            mic_reading = self._median([s for s in mic_samples if self._is_valid_number(s)], default=0)
             
             corrected_temperature = self.data_mgr.correct_temperature_reading(temperature)
+            corrected_temperature = self.data_mgr.filter_spike("temperature", corrected_temperature)
             self.set_temperature_edge_values(corrected_temperature)
             corrected_humidity = self.data_mgr.correct_humidity_reading(humidity, temperature, corrected_temperature)
-            adjusted_pressure = self.data_mgr.adjust_to_sea_pressure(pressure, corrected_temperature, self.config.ALTITUDE)
+            corrected_humidity = self.data_mgr.filter_spike("humidity", corrected_humidity)
+            altitude = getattr(self.config, "ALTITUDE", 0)
+            adjusted_pressure = self.data_mgr.adjust_to_sea_pressure(pressure, corrected_temperature, altitude)
+            adjusted_pressure = self.data_mgr.filter_spike("pressure", adjusted_pressure)
             adjusted_enviro_plus_lux = self.data_mgr.adjust_lux_for_growhouse(enviro_plus_lux)
-            
-            gas_quality = self.data_mgr.interpret_gas_reading(gas)
+            adjusted_enviro_plus_lux = self.data_mgr.filter_spike("lux", adjusted_enviro_plus_lux)
+
+            heater_stable = bool(status & STATUS_HEATER_STABLE)
+            if gas is None:
+                gas = None
+                gas_quality = "Unavailable"
+            else:
+                gas = self.data_mgr.filter_spike("gas", gas)
+                self.set_gas_edge_values(gas)
+                gas_quality = self.data_mgr.interpret_gas_reading(gas) if heater_stable else "Warming"
             mic_db = self.data_mgr.interpret_mic_reading(mic_reading)
+            light_status = self.data_mgr.describe_light(adjusted_enviro_plus_lux)
+            humidity_status = self.data_mgr.describe_humidity(corrected_humidity)
+            dew_point = self.data_mgr.calculate_dew_point(corrected_temperature, corrected_humidity)
+            sound_status = self.data_mgr.describe_sound(mic_db)
+            vpd = self.data_mgr.calculate_vpd(corrected_temperature, corrected_humidity)
+            vpd_status = self.data_mgr.describe_vpd(vpd)
 
             # env_status, issues, light_status = self.data_mgr.describe_growhouse_environment(
             #     corrected_temperature, corrected_humidity, adjusted_enviro_plus_lux)
             self.sensor_data = {
                 "temperature": corrected_temperature,
                 "humidity": corrected_humidity,
+                "humidity_status": humidity_status,
+                "dew_point": dew_point,
+                "vpd": vpd,
+                "vpd_status": vpd_status,
                 "pressure": adjusted_pressure,
                 "gas": gas,
                 "gas_quality": gas_quality,
+                "heater_stable": heater_stable,
                 "lux": adjusted_enviro_plus_lux,
-                # "light_status": light_status,
+                "light_status": light_status,
                 "mic": mic_db,
-                "status": bme_data[4]
+                "sound_status": sound_status,
+                "status": status
                 # "env_status": env_status,
                 # "env_issues": issues
             }

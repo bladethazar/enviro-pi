@@ -31,7 +31,8 @@ class SystemManager:
         self.led_manager = None
         self.processing_tasks = set()
         self.errors = set()
-        self.time_offset = self.config.DST_HOURS * 3600  # 2 hours offset for summer time (CEST)
+        dst_hours = getattr(self.config, "DST_HOURS", 0)
+        self.time_offset = dst_hours * 3600
 
   
     def feed_watchdog(self):
@@ -255,17 +256,17 @@ class SystemManager:
 
     def get_current_config_data(self):
         return {
-            "temperature_offset": self.config.TEMPERATURE_OFFSET,
-            "humidity_offset": self.config.HUMIDITY_OFFSET,
-            "enviro_plus_display_brightness": self.config.ENVIRO_PLUS_DISPLAY_BRIGHTNESS,
-            "mic_min_value": self.config.MIC_MIN_VALUE,
-            "mic_max_value": self.config.MIC_MAX_VALUE,
-            "mqtt_update_interval": self.config.MQTT_UPDATE_INTERVAL
+            "temperature_offset": getattr(self.config, "TEMPERATURE_OFFSET", 0),
+            "humidity_offset": getattr(self.config, "HUMIDITY_OFFSET", 0),
+            "enviro_plus_display_brightness": getattr(self.config, "ENVIRO_PLUS_DISPLAY_BRIGHTNESS", 0.8),
+            "mic_min_value": getattr(self.config, "MIC_MIN_VALUE", 30000),
+            "mic_max_value": getattr(self.config, "MIC_MAX_VALUE", 65535),
+            "mqtt_update_interval": getattr(self.config, "MQTT_UPDATE_INTERVAL", 60)
         }
 
 
     def print_system_data(self):
-        mqtt_data, influx_data = self.get_system_data()
+        mqtt_data = self.get_system_data()
         self.log_mgr.log("System Data:")
         for category, values in mqtt_data.items():
             self.log_mgr.log(f"  {category}:")

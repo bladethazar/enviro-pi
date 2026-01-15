@@ -1,27 +1,23 @@
-# Enviro-Pi: Advanced Plant Monitoring and Watering System
+# Enviro-Pi: Growspace Monitoring
 
 ## Project Overview
 
-Enviro-Pi is a sophisticated plant monitoring and automated watering system designed for use in real growhouse environments. Built on the Raspberry Pi Pico W platform and utilizing MicroPython, this system integrates various sensors and components to provide comprehensive plant care, environmental monitoring, and intelligent watering control.
+Enviro-Pi is a growspace monitoring system built around the Pico Enviro+ Pack. It uses MicroPython to collect reliable environmental data from the built-in sensors and shows it on the onboard LCD, with VPD visibility for plant health tuning.
 
 ### Key Features
 
-- Automated plant watering based on real-time soil moisture levels
-- Environmental monitoring (temperature, humidity, pressure, light, UV, gas, sound)
+- Environmental monitoring (temperature, humidity, pressure, light, gas, sound, VPD)
 - MQTT integration for remote monitoring and control
 - Configurable settings via MQTT for easy customization of configuration values and settings
-- InfluxDB integration for long-term data storage and analysis
-- Interactive display interface with multiple information modes
-- Manual control options with both on-board and external buttons
+- Optional InfluxDB integration for long-term data storage and analysis
+- Interactive display interface with multiple sensor modes
+- Manual control via the Enviro+ pHAT buttons
 - Robust error handling and system health monitoring
 
 ## Hardware Components
 
 - Raspberry Pi Pico W
-- M5-Stack Watering Unit
-- Pimoroni Pico Enviro+ pHAT
-- LTR-390 UV and Ambient Light Sensor
-- External momentary button for manual control
+- Pimoroni Pico Enviro+ Pack (BME688, LTR-559, mic, LCD, buttons)
 
 ## Software Requirements
 
@@ -38,15 +34,14 @@ Enviro-Pi is a sophisticated plant monitoring and automated watering system desi
    cp config.json.template config.json
    ```
 
-4. Edit `config.json` with your Wi-Fi credentials, MQTT broker details, InfluxDB settings, and other configuration options.
+4. Edit `config.json` with your Wi-Fi credentials, MQTT broker details, and optional InfluxDB settings.
 5. Upload all project files to your Pico W.
 
 ## Configuration
 
 The `config.json` file is the central configuration point for Enviro-Pi. Key configuration sections include:
 
-- Network settings (Wi-Fi, MQTT, InfluxDB)
-- Watering control parameters
+- Network settings (Wi-Fi, MQTT, optional InfluxDB)
 - Environmental thresholds
 - Display and LED settings
 - System update intervals
@@ -57,35 +52,36 @@ Refer to `config.json.template` for a complete list of configurable options.
 
 Once powered on and configured, Enviro-Pi will:
 
-1. Establish network connections (Wi-Fi, MQTT, InfluxDB)
+1. Establish network connections (Wi-Fi, MQTT, optional InfluxDB)
 2. Initialize all sensors and components
-3. Begin continuous monitoring of soil moisture and environmental conditions
-4. Automatically water plants based on moisture thresholds
-5. Transmit data to MQTT and InfluxDB at configured intervals
-6. Display real-time information on the Enviro+ screen
+3. Begin continuous monitoring of growspace conditions
+4. Transmit data to MQTT and (if enabled) InfluxDB at configured intervals
+5. Display real-time information on the Enviro+ screen
 
 ### User Interaction
 
 - Enviro+ pHAT Buttons:
-  - A: Toggle display backlight
-  - B: Update sensors / Reset water tank (mode-dependent)
-  - X: Cycle through display modes
-  - Y: Manual watering / Update UV index (mode-dependent)
-- External button: Manual watering control
+  - A: Previous display mode
+  - B: Toggle display backlight
+  - X: Next display mode
+  - Y: Reset min/max (sensor modes) or mode-specific action
 
 ### Display Modes
 
-1. Sensor Mode: Environmental data overview
-2. Watering Mode: Soil moisture and watering system status
-3. Log Mode: Recent system events and notifications
-4. System Mode: Device performance and health metrics
+1. Overview Mode: Environmental summary
+2. Air Mode: Temperature, humidity, dew point, pressure, gas
+3. VPD Mode: Vapor pressure deficit with status
+4. Light Mode: Light levels and status
+5. Sound Mode: Ambient sound level
+6. Log Mode: Recent system events and notifications
+7. System Mode: Device performance and health metrics
 
 ## Troubleshooting
 
 - Check `config.json` for correct network and sensor settings
 - Use Log Mode on the display to view recent system events and errors
 - Ensure all hardware connections are secure
-- Verify MQTT and InfluxDB server accessibility
+- Verify MQTT connectivity and (if enabled) InfluxDB accessibility
 
 ## Contributing
 
